@@ -57,7 +57,7 @@ export default function Login() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Card className="w-full max-w-xl bg-black/40 border-white/10 backdrop-blur-lg shadow-2xl min-h-[600px]">
+        <Card className="w-[450px] max-w-xl bg-black/40 border-white/10 backdrop-blur-lg shadow-2xl min-h-[600px]">
           <CardHeader className="space-y-1 pt-8">
             <CardTitle className="text-4xl font-bold text-white text-center">Welcome Back</CardTitle>
             <CardDescription className="text-zinc-400 text-center text-lg">
