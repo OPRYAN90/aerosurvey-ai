@@ -1,8 +1,9 @@
 import "./globals.css";
-import { Navbar } from '@/components/ui/navbar'
-import localFont from "next/font/local";
 import type { Metadata } from "next";
+import localFont from "next/font/local";
+import { Layout } from '@/components/layout'
 import { AuthProvider } from '@/contexts/auth-context'
+import { NavbarProvider } from '@/contexts/navbar-context'
 
 // Metadata definition
 export const metadata: Metadata = {
@@ -25,15 +26,18 @@ const geistMono = localFont({
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-black`}>
         <AuthProvider>
-          <Navbar />
-          {children}
+          <NavbarProvider>
+            <Layout>
+              {children}
+            </Layout>
+          </NavbarProvider>
         </AuthProvider>
       </body>
     </html>
