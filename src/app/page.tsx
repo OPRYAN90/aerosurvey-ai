@@ -56,7 +56,7 @@ export default function Homepage() {
       <div className={`
         relative z-10 min-h-screen pointer-events-none
         transition-all duration-500 ease-in-out
-        ${isCameraMoving ? 'opacity-30' : 'opacity-100'}
+        ${isCameraMoving ? 'opacity-0' : 'opacity-100'}
       `}>
         {/* Title Section */}
         <div className="h-[30vh] flex flex-col items-center justify-center p-8">

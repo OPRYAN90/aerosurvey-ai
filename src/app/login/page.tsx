@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from 'next/link'
-import { ArrowRight, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { ArrowRight, Mail, Lock, Eye, EyeOff, Home } from 'lucide-react'
 import { auth } from '@/lib/firebase'
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { useRouter } from 'next/navigation'
@@ -52,6 +52,17 @@ export default function Login() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 flex items-center justify-center p-4">
+      {/* Home Button */}
+      <Link href="/" className="absolute top-4 left-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="w-10 h-10 rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm border border-white/10"
+        >
+          <Home className="w-5 h-5" />
+        </Button>
+      </Link>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
