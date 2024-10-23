@@ -25,6 +25,12 @@ function LoadingSpinner() {
 
 export default function Homepage() {
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isCameraMoving, setIsCameraMoving] = useState(false)
+
+  // Add this function to handle camera movement
+  const handleCameraMove = (isMoving: boolean) => {
+    setIsCameraMoving(isMoving)
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-black">
@@ -38,13 +44,20 @@ export default function Homepage() {
             onCreated={() => setIsLoaded(true)}
             style={{ touchAction: 'none' }} // Ensures proper touch handling
           >
-            <DroneScene isAnimating={true} />
+            <DroneScene 
+              isAnimating={true} 
+              onCameraMove={handleCameraMove}
+            />
           </Canvas>
         </Suspense>
       </div>
       
-      {/* Content Overlay - Now uses pointerEvents-none by default */}
-      <div className="relative z-10 min-h-screen pointer-events-none">
+      {/* Update the content overlay with transition based on camera movement */}
+      <div className={`
+        relative z-10 min-h-screen pointer-events-none
+        transition-all duration-500 ease-in-out
+        ${isCameraMoving ? 'opacity-30' : 'opacity-100'}
+      `}>
         {/* Title Section */}
         <div className="h-[30vh] flex flex-col items-center justify-center p-8">
           <h1 className="text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-500">

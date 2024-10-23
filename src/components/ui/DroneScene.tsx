@@ -5,7 +5,13 @@ import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, SpotLight, useDepthBuffer, Stars } from '@react-three/drei'
 
-export function DroneScene({ isAnimating }: { isAnimating: boolean }) {
+export function DroneScene({ 
+  isAnimating, 
+  onCameraMove 
+}: { 
+  isAnimating: boolean
+  onCameraMove: (isMoving: boolean) => void 
+}) {
   const droneGroup = useRef<THREE.Group>(null)
   const rotorsRef = useRef<THREE.Mesh[]>([])
   const sprayPointsRef = useRef<number[]>([])
@@ -119,6 +125,69 @@ export function DroneScene({ isAnimating }: { isAnimating: boolean }) {
       new THREE.Float32BufferAttribute(sprayIntensitiesRef.current, 1)
     )
   })
+
+  useEffect(() => {
+    let isMouseDown = false;
+    let isWheeling = false;
+    let wheelTimeout: NodeJS.Timeout;
+
+    const handleMouseDown = () => {
+      isMouseDown = true;
+      onCameraMove(true);
+    };
+
+    const handleMouseUp = () => {
+      isMouseDown = false;
+      if (!isWheeling) {
+        onCameraMove(false);
+      }
+    };
+
+    const handleWheel = () => {
+      isWheeling = true;
+      onCameraMove(true);
+      
+      // Clear existing timeout
+      clearTimeout(wheelTimeout);
+      
+      // Set new timeout
+      wheelTimeout = setTimeout(() => {
+        isWheeling = false;
+        if (!isMouseDown) {
+          onCameraMove(false);
+        }
+      }, 150);
+    };
+
+    // Touch events for mobile
+    const handleTouchStart = () => {
+      isMouseDown = true;
+      onCameraMove(true);
+    };
+
+    const handleTouchEnd = () => {
+      isMouseDown = false;
+      onCameraMove(false);
+    };
+
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('wheel', handleWheel);
+    window.addEventListener('touchstart', handleTouchStart);
+    window.addEventListener('touchend', handleTouchEnd);
+    // Also handle case where mouse leaves the window
+    window.addEventListener('mouseleave', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('mouseleave', handleMouseUp);
+      clearTimeout(wheelTimeout);
+    };
+  }, [onCameraMove]);
 
   return (
     <>
