@@ -2,6 +2,7 @@ import "./globals.css";
 import { Navbar } from '@/components/ui/navbar'
 import localFont from "next/font/local";
 import type { Metadata } from "next";
+import { AuthProvider } from '@/contexts/auth-context'
 
 // Metadata definition
 export const metadata: Metadata = {
@@ -30,8 +31,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-black`}>
-        <Navbar />
-        {children}
+        <AuthProvider>
+          <Navbar />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
