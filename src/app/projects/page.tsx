@@ -22,6 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+interface Project {
+  name: string
+  material: string
+  customMaterial: string
+  materialCost: string
+  file: File | null
+}
+
 const defaultMaterials = [
   { name: 'Asphalt Concrete', cost: 85 },
   { name: 'Portland Cement Concrete', cost: 90 },
@@ -30,9 +38,9 @@ const defaultMaterials = [
 ]
 
 export default function Projects() {
-  const [projects, setProjects] = useState([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [isCreating, setIsCreating] = useState(false)
-  const [newProject, setNewProject] = useState({
+  const [newProject, setNewProject] = useState<Project>({
     name: '',
     material: '',
     customMaterial: '',
@@ -53,8 +61,8 @@ export default function Projects() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-20">
-      <div className="p-6 space-y-6">
+    <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-14">
+      <div className="p-5 space-y-5">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-white">Projects</h1>
@@ -136,7 +144,10 @@ export default function Projects() {
                       id="lidar-file"
                       className="hidden"
                       accept=".las,.laz"
-                      onChange={(e) => setNewProject({ ...newProject, file: e.target.files[0] })}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null
+                        setNewProject({ ...newProject, file })
+                      }}
                     />
                     <label htmlFor="lidar-file" className="cursor-pointer">
                       <div className="flex flex-col items-center gap-2">
@@ -188,7 +199,7 @@ export default function Projects() {
 
         {/* Empty State */}
         {projects.length === 0 && (
-          <div className="text-center py-12">
+          <div className="text-center py-8">
             <div className="mx-auto w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
               <Plus className="w-10 h-10 text-blue-500" />
             </div>
