@@ -21,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { storage } from '@/lib/firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 interface Project {
   name: string
@@ -28,6 +30,7 @@ interface Project {
   customMaterial: string
   materialCost: string
   file: File | null
+  fileUrl?: string
 }
 
 const defaultMaterials = [
@@ -36,6 +39,24 @@ const defaultMaterials = [
   { name: 'Gravel', cost: 45 },
   { name: 'Composite Pavement', cost: 95 },
 ]
+
+function handleFileUpload(file: File, onUploadSuccess: (url: string) => void) {
+  const storageRef = ref(storage, `uploads/${file.name}`)
+  console.log('Starting upload for:', file.name)
+
+  uploadBytes(storageRef, file)
+    .then((snapshot) => {
+      console.log('Upload successful!', snapshot)
+      return getDownloadURL(snapshot.ref)
+    })
+    .then((url) => {
+      console.log('File available at', url)
+      onUploadSuccess(url)
+    })
+    .catch((error) => {
+      console.error('Error uploading file:', error)
+    })
+}
 
 export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -48,8 +69,8 @@ export default function Projects() {
     file: null,
   })
 
-  const handleCreateProject = () => {
-    setProjects([...projects, newProject])
+  const handleCreateProject = (fileUrl: string) => {
+    setProjects([...projects, { ...newProject, fileUrl }])
     setIsCreating(false)
     setNewProject({
       name: '',
@@ -146,7 +167,10 @@ export default function Projects() {
                       accept=".las,.laz"
                       onChange={(e) => {
                         const file = e.target.files?.[0] || null
-                        setNewProject({ ...newProject, file })
+                        if (file) {
+                          setNewProject({ ...newProject, file })
+                          handleFileUpload(file, handleCreateProject) // Pass the callback here
+                        }
                       }}
                     />
                     <label htmlFor="lidar-file" className="cursor-pointer">
@@ -168,7 +192,7 @@ export default function Projects() {
                     Cancel
                   </Button>
                   <Button
-                    onClick={handleCreateProject}
+                    onClick={() => handleCreateProject('')}
                     className="bg-blue-500 hover:bg-blue-600 text-white"
                     disabled={!newProject.name || !newProject.material || !newProject.file}
                   >
@@ -192,6 +216,11 @@ export default function Projects() {
                 <CardDescription className="text-white/70">
                   Material: {project.material === 'custom' ? project.customMaterial : project.material}
                 </CardDescription>
+                {project.fileUrl && (
+                  <a href={project.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">
+                    View Uploaded File
+                  </a>
+                )}
               </CardHeader>
             </Card>
           ))}
@@ -199,7 +228,7 @@ export default function Projects() {
 
         {/* Empty State */}
         {projects.length === 0 && (
-          <div className="text-center py-8">
+          <div className="text-center py-12">
             <div className="mx-auto w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
               <Plus className="w-10 h-10 text-blue-500" />
             </div>
