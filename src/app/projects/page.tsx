@@ -33,7 +33,7 @@ interface Project {
   material: string
   customMaterial: string
   materialCost: string
-  file?: File | null // Make file optional since it's not stored in Firestore
+  file?: File | null
   fileUrl?: string
   userId?: string
   createdAt?: string
@@ -51,7 +51,7 @@ export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const { user } = useAuth()
+  const { user, isAuthReady } = useAuth()
   
   const [newProject, setNewProject] = useState<Project>({
     name: '',
@@ -69,7 +69,6 @@ export default function Projects() {
     fileName: '',
   });
 
-  // Fetch projects on component mount
   useEffect(() => {
     const fetchProjects = async () => {
       if (!user) {
@@ -78,7 +77,6 @@ export default function Projects() {
       }
 
       try {
-        console.log('Fetching projects for user:', user.uid) // Debug log
         const q = query(
           collection(db, 'projects'),
           where('userId', '==', user.uid)
@@ -88,21 +86,18 @@ export default function Projects() {
           id: doc.id,
           ...doc.data()
         })) as Project[]
-        console.log('Fetched projects:', projectsData) // Debug log
         setProjects(projectsData)
       } catch (error) {
         console.error('Error fetching projects:', error)
-        // Add more detailed error logging
-        if (error instanceof Error) {
-          console.error('Error details:', error.message)
-        }
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchProjects()
-  }, [user])
+    if (isAuthReady) {
+      fetchProjects()
+    }
+  }, [user, isAuthReady])
 
   const handleFileUpload = async (file: File) => {
     if (!user) {
@@ -164,8 +159,8 @@ export default function Projects() {
     }
   };
 
-  // Show loading state with a simpler loading indicator
-  if (isLoading) {
+  // Show loading state while fetching projects
+  if (!isAuthReady || isLoading) {
     return (
       <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-14">
         <div className="p-5">
@@ -195,7 +190,7 @@ export default function Projects() {
           </div>
         </div>
       </main>
-    )
+    );
   }
 
   return (
@@ -339,33 +334,32 @@ export default function Projects() {
           </Dialog>
         </div>
 
-        {/* Projects Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project, index) => (
-            <Card
-              key={index}
-              className="bg-black/40 border-white/10 backdrop-blur-lg hover:border-white/20 transition-all cursor-pointer"
-            >
-              <CardHeader>
-                <CardTitle className="text-white">{project.name}</CardTitle>
-                <CardDescription className="text-white/70">
-                  Material: {project.material === 'custom' ? project.customMaterial : project.material}
-                </CardDescription>
-                {project.fileUrl && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm text-white/50">{project.fileName}</span>
-                    <a href={project.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">
-                      View Uploaded File
-                    </a>
-                  </div>
-                )}
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
-
-        {/* Empty State - Only show when not loading and no projects */}
-        {!isLoading && projects.length === 0 && (
+        {/* Projects Grid or Empty State */}
+        {projects.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.map((project) => (
+              <Card
+                key={project.id}
+                className="bg-black/40 border-white/10 backdrop-blur-lg hover:border-white/20 transition-all cursor-pointer"
+              >
+                <CardHeader>
+                  <CardTitle className="text-white">{project.name}</CardTitle>
+                  <CardDescription className="text-white/70">
+                    Material: {project.material === 'custom' ? project.customMaterial : project.material}
+                  </CardDescription>
+                  {project.fileUrl && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm text-white/50">{project.fileName}</span>
+                      <a href={project.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">
+                        View Uploaded File
+                      </a>
+                    </div>
+                  )}
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        ) : (
           <div className="text-center py-12">
             <div className="mx-auto w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
               <Plus className="w-10 h-10 text-blue-500" />

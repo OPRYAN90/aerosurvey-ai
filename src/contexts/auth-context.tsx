@@ -8,19 +8,19 @@ import { setCookie, deleteCookie } from 'cookies-next'
 
 interface AuthContextType {
   user: User | null
-  isLoading: boolean
+  isAuthReady: boolean
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  isLoading: true,
+  isAuthReady: false,
   signOut: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isAuthReady, setIsAuthReady] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
         deleteCookie('auth')
       }
-      setIsLoading(false)
+      setIsAuthReady(true)
     })
 
     return () => unsubscribe()
@@ -54,8 +54,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Show loading state until auth is ready
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-14">
+        <div className="p-5 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/70" />
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, signOut }}>
+    <AuthContext.Provider value={{ user, isAuthReady, signOut }}>
       {children}
     </AuthContext.Provider>
   )
