@@ -30,10 +30,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-black`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}>
+        {/* Fixed gradient background with adjusted colors */}
+        <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-blue-900" />
+        
         <AuthProvider>
-          <Navbar />
-          {children}
+          <div className="relative min-h-screen">
+            <Navbar />
+            <main>
+              {children}
+            </main>
+          </div>
         </AuthProvider>
       </body>
     </html>

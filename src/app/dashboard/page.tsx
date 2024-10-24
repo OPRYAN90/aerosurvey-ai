@@ -12,33 +12,31 @@ export default function Dashboard() {
 
   if (!hasProjects) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-20">
-        <div className="min-h-[80vh] flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-black/40 border-white/10 backdrop-blur-lg">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 mb-4 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <FolderPlus className="w-8 h-8 text-blue-500" />
-              </div>
-              <CardTitle className="text-2xl text-white mb-2">No Projects Yet</CardTitle>
-              <CardDescription className="text-white/70 mb-6">
-                Start by creating your first road analysis project to view insights and analytics.
-              </CardDescription>
-              <Button 
-                onClick={() => router.push('/projects')}
-                className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
-              >
-                Go to Projects <ArrowRight className="w-4 h-4" />
-              </Button>
-            </CardHeader>
-          </Card>
-        </div>
-      </main>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-black/40 border-white/10 backdrop-blur-lg">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 mb-4 rounded-full bg-blue-500/10 flex items-center justify-center">
+              <FolderPlus className="w-8 h-8 text-blue-500" />
+            </div>
+            <CardTitle className="text-2xl text-white mb-2">No Projects Yet</CardTitle>
+            <CardDescription className="text-white/70 mb-6">
+              Start by creating your first road analysis project to view insights and analytics.
+            </CardDescription>
+            <Button 
+              onClick={() => router.push('/projects')}
+              className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
+            >
+              Go to Projects <ArrowRight className="w-4 h-4" />
+            </Button>
+          </CardHeader>
+        </Card>
+      </div>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-20">
+    <div className="min-h-screen">
       <div>Dashboard with project insights</div>
-    </main>
+    </div>
   )
 }

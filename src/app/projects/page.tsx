@@ -1,130 +1,204 @@
-"use client"
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { usePathname } from 'next/navigation'
-import { useAuth } from '@/contexts/auth-context'
-import { LogOut, LayoutDashboard, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { cn } from '@/lib/utils'
+"use client";
+import React, { useState } from 'react';
+import { Plus, Upload, X } from 'lucide-react';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 
-export function Navbar() {
-  const pathname = usePathname()
-  const { user, signOut } = useAuth()
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const [isHovering, setIsHovering] = useState(false)
-  const [navbarHeight, setNavbarHeight] = useState(0)
-  
-  const isAuthPage = pathname === '/signin' || pathname === '/login' || pathname === '/signup'
-  const isAuthedRoute = pathname === '/dashboard' || pathname === '/projects'
+const defaultMaterials = [
+  { name: 'Asphalt Concrete', cost: 85 },
+  { name: 'Portland Cement Concrete', cost: 90 },
+  { name: 'Gravel', cost: 45 },
+  { name: 'Composite Pavement', cost: 95 },
+];
 
-  useEffect(() => {
-    const updateHeight = () => {
-      const navbar = document.getElementById('navbar-content')
-      if (navbar) {
-        setNavbarHeight(navbar.offsetHeight)
-      }
-    }
-    updateHeight()
-    window.addEventListener('resize', updateHeight)
-    return () => window.removeEventListener('resize', updateHeight)
-  }, [])
+export default function Projects() {
+  const [projects, setProjects] = useState([]);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newProject, setNewProject] = useState({
+    name: '',
+    material: '',
+    customMaterial: '',
+    materialCost: '',
+    file: null,
+  });
 
-  if (isAuthPage) {
-    return null
-  }
-
-  const isExpanded = !isCollapsed || isHovering
+  const handleCreateProject = () => {
+    setProjects([...projects, newProject]);
+    setIsCreating(false);
+    setNewProject({
+      name: '',
+      material: '',
+      customMaterial: '',
+      materialCost: '',
+      file: null,
+    });
+  };
 
   return (
-    <>
-      <div 
-        style={{ 
-          height: isExpanded ? navbarHeight : '4px',
-          transition: 'height 300ms ease-in-out'
-        }} 
-      />
-      
-      <div 
-        className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out",
-          "before:absolute before:inset-0 before:bg-gradient-to-br before:from-black/50 before:via-gray-900/50 before:to-blue-900/50 before:backdrop-blur-sm",
-          isCollapsed && !isHovering ? "-translate-y-[calc(100%-4px)]" : "translate-y-0"
-        )}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-      >
-        <div id="navbar-content" className="relative z-10 p-4">
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <Link href="/" className="flex items-center">
-              <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-500">
-                AeroSurvey AI
-              </span>
-            </Link>
-            
-            {isAuthedRoute ? (
-              <div className="flex items-center gap-4">
-                <nav className="flex items-center gap-2 mr-4">
-                  <Button
-                    variant="ghost"
-                    className="text-white hover:text-blue-400 transition-colors flex items-center gap-2"
-                    asChild
-                  >
-                    <Link href="/dashboard">
-                      <LayoutDashboard className="w-4 h-4" />
-                      Dashboard
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="text-white hover:text-blue-400 transition-colors flex items-center gap-2"
-                    asChild
-                  >
-                    <Link href="/projects">
-                      <FolderOpen className="w-4 h-4" />
-                      Projects
-                    </Link>
-                  </Button>
-                </nav>
-                <Button
-                  variant="ghost"
-                  onClick={signOut}
-                  className="text-white hover:text-red-400 transition-colors flex items-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
-                </Button>
-              </div>
-            ) : (
-              <div className="flex gap-4">
-                <Button
-                  variant="ghost"
-                  className="text-white hover:text-blue-400 transition-colors"
-                  asChild
-                >
-                  <Link href="/login">Login</Link>
-                </Button>
-                <Button
-                  className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
-                  asChild
-                >
-                  <Link href="/signup">Sign Up</Link>
-                </Button>
-              </div>
-            )}
-          </div>
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Projects</h1>
+          <p className="text-white/70 mt-1">Create and manage your road analysis projects</p>
         </div>
+        <Dialog open={isCreating} onOpenChange={setIsCreating}>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2">
+              <Plus className="w-4 h-4" /> New Project
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-gray-900 border border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle>Create New Project</DialogTitle>
+              <DialogDescription className="text-white/70">
+                Fill in the project details to start your road analysis
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="project-name">Project Name</Label>
+                <Input
+                  id="project-name"
+                  placeholder="Enter project name"
+                  className="bg-black/40 border-white/10 text-white"
+                  value={newProject.name}
+                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                />
+              </div>
 
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center cursor-pointer group hover:scale-110 transition-all duration-200 z-10"
-        >
-          {isCollapsed ? (
-            <ChevronDown className="w-4 h-4 text-white transition-transform" />
-          ) : (
-            <ChevronUp className="w-4 h-4 text-white transition-transform" />
-          )}
-        </button>
+              <div className="space-y-2">
+                <Label>Road Material</Label>
+                <Select 
+                  onValueChange={(value) => setNewProject({ ...newProject, material: value })}
+                >
+                  <SelectTrigger className="bg-black/40 border-white/10 text-white">
+                    <SelectValue placeholder="Select material" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-900 border-white/10 text-white">
+                    {defaultMaterials.map((material) => (
+                      <SelectItem key={material.name} value={material.name}>
+                        {material.name} (${material.cost}/m³)
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">Custom Material</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {newProject.material === 'custom' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Custom Material Name</Label>
+                    <Input
+                      placeholder="Enter material name"
+                      className="bg-black/40 border-white/10 text-white"
+                      value={newProject.customMaterial}
+                      onChange={(e) => setNewProject({ ...newProject, customMaterial: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cost per Cubic Meter ($)</Label>
+                    <Input
+                      type="number"
+                      placeholder="Enter cost"
+                      className="bg-black/40 border-white/10 text-white"
+                      value={newProject.materialCost}
+                      onChange={(e) => setNewProject({ ...newProject, materialCost: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>LiDAR Data</Label>
+                <div className="border-2 border-dashed border-white/10 rounded-lg p-8 text-center hover:border-white/20 transition-colors">
+                  <input
+                    type="file"
+                    id="lidar-file"
+                    className="hidden"
+                    accept=".las,.laz"
+                    onChange={(e) => setNewProject({ ...newProject, file: e.target.files[0] })}
+                  />
+                  <label htmlFor="lidar-file" className="cursor-pointer">
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="w-8 h-8 text-white/70" />
+                      <p className="text-white/70">Drop LiDAR files here or click to upload</p>
+                      <p className="text-sm text-white/50">Supports .LAS and .LAZ files</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCreating(false)}
+                  className="border-white/10 text-white hover:bg-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateProject}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                  disabled={!newProject.name || !newProject.material || !newProject.file}
+                >
+                  Create Project
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-    </>
-  )
+
+      {/* Projects Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {projects.map((project, index) => (
+          <Card
+            key={index}
+            className="bg-black/40 border-white/10 backdrop-blur-lg hover:border-white/20 transition-all cursor-pointer"
+          >
+            <CardHeader>
+              <CardTitle className="text-white">{project.name}</CardTitle>
+              <CardDescription className="text-white/70">
+                Material: {project.material === 'custom' ? project.customMaterial : project.material}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
+
+      {/* Empty State */}
+      {projects.length === 0 && (
+        <div className="text-center py-12">
+          <div className="mx-auto w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
+            <Plus className="w-10 h-10 text-blue-500" />
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">No projects yet</h3>
+          <p className="text-white/70 mb-6">Create your first project to get started</p>
+        </div>
+      )}
+    </div>
+  );
 }
