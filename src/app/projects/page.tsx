@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Plus, Upload } from 'lucide-react'
+import { Plus, Upload, Trash2 } from 'lucide-react'
 import { 
   Dialog,
   DialogContent,
@@ -22,9 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { storage } from '@/lib/firebase'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { ref, uploadBytes, getDownloadURL, deleteObject, ref as storageRef } from 'firebase/storage'
 import { db } from '@/lib/firebase'
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore'
+import { collection, addDoc, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { useAuth } from '@/contexts/auth-context'
 
 interface Project {
@@ -159,6 +159,31 @@ export default function Projects() {
     }
   };
 
+  const handleDeleteProject = async (projectId: string, fileUrl?: string) => {
+    if (!user || !projectId) return
+
+    try {
+      // Delete from Firestore
+      await deleteDoc(doc(db, 'projects', projectId))
+
+      // Delete file from Storage if it exists
+      if (fileUrl) {
+        const fileRef = storageRef(storage, fileUrl)
+        try {
+          await deleteObject(fileRef)
+        } catch (error) {
+          console.error('Error deleting file:', error)
+          // Continue with project deletion even if file deletion fails
+        }
+      }
+
+      // Update local state
+      setProjects(projects.filter(project => project.id !== projectId))
+    } catch (error) {
+      console.error('Error deleting project:', error)
+    }
+  }
+
   // Show loading state while fetching projects
   if (!isAuthReady || isLoading) {
     return (
@@ -207,7 +232,11 @@ export default function Projects() {
                 <Plus className="w-4 h-4" /> New Project
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-gray-900 border border-white/10 text-white max-h-[90vh] overflow-y-auto">
+            <DialogContent 
+              className="bg-gray-900 border border-white/10 text-white max-h-[90vh] overflow-y-auto"
+              // Remove aria-hidden and use inert instead
+              inert={!isCreating ? "" : undefined}
+            >
               <DialogHeader>
                 <DialogTitle>Create New Project</DialogTitle>
                 <DialogDescription className="text-white/70">
@@ -340,17 +369,37 @@ export default function Projects() {
             {projects.map((project) => (
               <Card
                 key={project.id}
-                className="bg-black/40 border-white/10 backdrop-blur-lg hover:border-white/20 transition-all cursor-pointer"
+                className="bg-black/40 border-white/10 backdrop-blur-lg hover:border-white/20 transition-all group"
               >
                 <CardHeader>
-                  <CardTitle className="text-white">{project.name}</CardTitle>
-                  <CardDescription className="text-white/70">
-                    Material: {project.material === 'custom' ? project.customMaterial : project.material}
-                  </CardDescription>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <CardTitle className="text-white">{project.name}</CardTitle>
+                      <CardDescription className="text-white/70">
+                        Material: {project.material === 'custom' ? project.customMaterial : project.material}
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteProject(project.id!, project.fileUrl)
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                   {project.fileUrl && (
                     <div className="flex flex-col gap-1">
                       <span className="text-sm text-white/50">{project.fileName}</span>
-                      <a href={project.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">
+                      <a 
+                        href={project.fileUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-400 hover:text-blue-500 underline transition-colors"
+                      >
                         View Uploaded File
                       </a>
                     </div>
