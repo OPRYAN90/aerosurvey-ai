@@ -73,28 +73,43 @@ export default function Projects() {
 
   useEffect(() => {
     const fetchProjects = async () => {
+      console.log('Starting fetchProjects, user:', user?.uid)
+      
       if (!user) {
+        console.log('No user found, setting loading to false')
         setIsLoading(false)
         return
       }
 
       try {
+        console.log('Querying Firestore for projects...')
         const q = query(
           collection(db, 'projects'),
           where('userId', '==', user.uid)
         )
         const querySnapshot = await getDocs(q)
+        console.log('Query complete, document count:', querySnapshot.size)
+        
         const projectsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Project[]
+        console.log('Processed projects data:', projectsData)
+        
         setProjects(projectsData)
       } catch (error) {
-        console.error('Error fetching projects:', error)
+        console.error('Error in fetchProjects:', error)
       } finally {
+        console.log('Setting loading to false')
         setIsLoading(false)
       }
     }
+
+    console.log('Projects useEffect triggered', {
+      isAuthReady,
+      userId: user?.uid,
+      isLoading
+    })
 
     if (isAuthReady) {
       fetchProjects()
@@ -102,20 +117,16 @@ export default function Projects() {
   }, [user, isAuthReady])
 
   const handleFileUpload = async (file: File) => {
-    if (!user) {
-      console.error('No user found');
-      return;
-    }
+    if (!user) return;
 
     setUploadProgress({ isUploading: true, fileName: file.name });
     const storageRef = ref(storage, `uploads/${user.uid}/${file.name}`);
 
     try {
-      // Add metadata when uploading
       const snapshot = await uploadBytes(storageRef, file, {
         customMetadata: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/octet-stream'
+          'Content-Type': 'application/octet-stream',
+          'Access-Control-Allow-Origin': '*'
         }
       });
       const url = await getDownloadURL(snapshot.ref);
@@ -125,7 +136,6 @@ export default function Projects() {
         fileUrl: url,
         fileName: file.name
       }));
-
     } catch (error) {
       console.error('Error uploading file:', error);
     } finally {
@@ -193,6 +203,7 @@ export default function Projects() {
 
   // Show loading state while fetching projects
   if (!isAuthReady || isLoading) {
+    console.log('Rendering loading state', { isAuthReady, isLoading })
     return (
       <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-14">
         <div className="p-5">
@@ -224,6 +235,12 @@ export default function Projects() {
       </main>
     );
   }
+
+  // Add logging to main render
+  console.log('Rendering projects view', {
+    projectCount: projects.length,
+    isCreating
+  })
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-14">

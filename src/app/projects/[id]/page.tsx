@@ -37,26 +37,18 @@ export default function ProjectView() {
   })
 
   useEffect(() => {
+    let isMounted = true // Add mounted check
+
     const fetchProject = async () => {
-      if (!id) {
-        setLoadingState({
-          isLoading: false,
-          error: 'Project ID not found'
-        })
-        return
-      }
+      if (!id || !isMounted) return
 
       try {
-        setLoadingState({ isLoading: true, error: null })
-        const projectDoc = await getDoc(doc(db, 'projects', id as string))
-          .catch(error => {
-            // Handle Firebase connection errors
-            if (error.code === 'failed-precondition' || error.name === 'FirebaseError') {
-              throw new Error('Unable to connect to database. Please check your connection and ensure no content blockers are active.')
-            }
-            throw error
-          })
+        setLoadingState(prev => ({ ...prev, isLoading: true }))
         
+        const projectDoc = await getDoc(doc(db, 'projects', id as string))
+        
+        if (!isMounted) return // Check if still mounted
+
         if (!projectDoc.exists()) {
           setLoadingState({
             isLoading: false,
@@ -78,24 +70,47 @@ export default function ProjectView() {
           return
         }
 
-        setProject(projectData)
-        setLoadingState({ isLoading: false, error: null })
+        if (isMounted) {
+          setProject(projectData)
+          setLoadingState({ isLoading: false, error: null })
+        }
 
       } catch (error) {
-        console.error('Error fetching project:', error)
-        setLoadingState({
-          isLoading: false,
-          error: error instanceof Error 
-            ? error.message 
-            : 'Unable to load project. Please try again later.'
-        })
+        if (isMounted) {
+          setLoadingState({
+            isLoading: false,
+            error: error instanceof Error 
+              ? error.message 
+              : 'Unable to load project'
+          })
+        }
       }
     }
 
     fetchProject()
+
+    // Cleanup function
+    return () => {
+      isMounted = false
+    }
   }, [id])
 
+  const handleError = (error: string) => {
+    console.error('Viewer error:', error)
+    setLoadingState(prev => ({
+      ...prev,
+      error
+    }))
+  }
+
   const renderContent = () => {
+    console.log('ProjectView renderContent:', {
+      isLoading: loadingState.isLoading,
+      error: loadingState.error,
+      hasProject: !!project,
+      fileUrl: project?.fileUrl
+    })
+    
     if (loadingState.isLoading) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -135,7 +150,7 @@ export default function ProjectView() {
 
     return (
       <>
-        <LidarViewer fileUrl={project.fileUrl} />
+        <LidarViewer fileUrl={project.fileUrl} onError={handleError} />
         <div className="absolute top-4 right-4 flex gap-2">
           <Button
             variant="ghost"

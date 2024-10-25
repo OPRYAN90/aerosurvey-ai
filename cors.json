@@ -1,12 +1,13 @@
 [
     {
-      "origin": ["http://localhost:3000"],
+      "origin": ["*"],
       "method": ["GET", "HEAD", "OPTIONS"],
       "responseHeader": [
         "Content-Type",
         "Access-Control-Allow-Origin",
         "Content-Length",
-        "Content-Range"
+        "Content-Range",
+        "Accept"
       ],
       "maxAgeSeconds": 3600
     }
