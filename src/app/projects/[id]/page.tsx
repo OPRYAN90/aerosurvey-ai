@@ -1,13 +1,12 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { db } from '@/lib/firebase'
 import { doc, getDoc } from 'firebase/firestore'
 import { Project } from '@/types/project'
 import { Button } from '@/components/ui/button'
 import { 
-  DownloadCloud, 
   ZoomIn, 
   ZoomOut, 
   Maximize,
@@ -16,17 +15,31 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
-const LidarViewer = dynamic(() => import('@/components/LidarViewer'), { 
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-black/40">
-      <div className="animate-pulse space-y-4">
-        <div className="h-32 w-32 bg-blue-500/10 rounded-lg mx-auto" />
-        <p className="text-white/50 text-center">Loading viewer...</p>
+// Import LidarViewer with NoSSR and loading component
+const LidarViewer = dynamic(
+  () => import('@/components/LidarViewer'),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full min-h-[400px] flex items-center justify-center bg-black/40">
+        <div className="animate-pulse space-y-4">
+          <div className="h-32 w-32 bg-blue-500/10 rounded-lg mx-auto" />
+          <p className="text-white/50 text-center">Loading viewer...</p>
+        </div>
       </div>
-    </div>
-  )
-})
+    )
+  }
+)
+
+// Add this interface near the top of the file with other imports
+interface ViewerContainer extends HTMLDivElement {
+  viewerControls?: {
+    zoomIn: () => void;
+    zoomOut: () => void;
+    reset: () => void;
+    toggleFullscreen: () => void;
+  }
+}
 
 export default function ProjectView() {
   const { id } = useParams()
@@ -35,19 +48,20 @@ export default function ProjectView() {
     isLoading: true,
     error: null as string | null
   })
+  const containerRef = useRef<ViewerContainer>(null)
 
   useEffect(() => {
-    let isMounted = true // Add mounted check
+    let isMounted = true
 
     const fetchProject = async () => {
-      if (!id || !isMounted) return
+      if (!id) return
 
       try {
         setLoadingState(prev => ({ ...prev, isLoading: true }))
         
         const projectDoc = await getDoc(doc(db, 'projects', id as string))
         
-        if (!isMounted) return // Check if still mounted
+        if (!isMounted) return
 
         if (!projectDoc.exists()) {
           setLoadingState({
@@ -88,14 +102,10 @@ export default function ProjectView() {
     }
 
     fetchProject()
-
-    // Cleanup function
-    return () => {
-      isMounted = false
-    }
+    return () => { isMounted = false }
   }, [id])
 
-  const handleError = (error: string) => {
+  const handleViewerError = (error: string) => {
     console.error('Viewer error:', error)
     setLoadingState(prev => ({
       ...prev,
@@ -104,7 +114,7 @@ export default function ProjectView() {
   }
 
   const renderContent = () => {
-    console.log('ProjectView renderContent:', {
+    console.log('Rendering content:', {
       isLoading: loadingState.isLoading,
       error: loadingState.error,
       hasProject: !!project,
@@ -149,13 +159,20 @@ export default function ProjectView() {
     }
 
     return (
-      <>
-        <LidarViewer fileUrl={project.fileUrl} onError={handleError} />
+      <div className="relative w-full h-full min-h-[400px]" ref={containerRef}>
+        <LidarViewer 
+          fileUrl={project.fileUrl} 
+          onError={handleViewerError}
+        />
         <div className="absolute top-4 right-4 flex gap-2">
           <Button
             variant="ghost"
             size="icon"
             className="bg-black/50 hover:bg-black/70 text-white"
+            onClick={() => {
+              const controls = containerRef.current?.viewerControls
+              controls?.zoomIn()
+            }}
           >
             <ZoomIn className="h-4 w-4" />
           </Button>
@@ -163,6 +180,10 @@ export default function ProjectView() {
             variant="ghost"
             size="icon"
             className="bg-black/50 hover:bg-black/70 text-white"
+            onClick={() => {
+              const controls = containerRef.current?.viewerControls
+              controls?.zoomOut()
+            }}
           >
             <ZoomOut className="h-4 w-4" />
           </Button>
@@ -170,6 +191,10 @@ export default function ProjectView() {
             variant="ghost"
             size="icon"
             className="bg-black/50 hover:bg-black/70 text-white"
+            onClick={() => {
+              const controls = containerRef.current?.viewerControls
+              controls?.reset()
+            }}
           >
             <RotateCcw className="h-4 w-4" />
           </Button>
@@ -177,11 +202,15 @@ export default function ProjectView() {
             variant="ghost"
             size="icon"
             className="bg-black/50 hover:bg-black/70 text-white"
+            onClick={() => {
+              const controls = containerRef.current?.viewerControls
+              controls?.toggleFullscreen()
+            }}
           >
             <Maximize className="h-4 w-4" />
           </Button>
         </div>
-      </>
+      </div>
     )
   }
 
@@ -206,9 +235,7 @@ export default function ProjectView() {
           </div>
         )}
         <div className="relative h-[calc(100vh-200px)] w-full bg-black/40 rounded-lg overflow-hidden">
-          <div className="w-full h-full" style={{ minHeight: '400px' }}>
-            {renderContent()}
-          </div>
+          {renderContent()}
         </div>
       </div>
     </div>
