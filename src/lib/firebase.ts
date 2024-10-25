@@ -18,4 +18,10 @@ const auth = getAuth(app)
 const storage = getStorage(app) // Add this line to initialize storage
 const db = getFirestore(app)
 
-export { app, auth, storage, db }
+// Set custom metadata for CORS
+const metadata = {
+  cacheControl: 'public,max-age=3600',
+  contentType: 'application/octet-stream',
+};
+
+export { app, auth, storage, db, metadata }

@@ -26,6 +26,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject, ref as storageRef } fro
 import { db } from '@/lib/firebase'
 import { collection, addDoc, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { useAuth } from '@/contexts/auth-context'
+import { useRouter } from 'next/navigation'
 
 interface Project {
   id?: string
@@ -52,6 +53,7 @@ export default function Projects() {
   const [isCreating, setIsCreating] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const { user, isAuthReady } = useAuth()
+  const router = useRouter()
   
   const [newProject, setNewProject] = useState<Project>({
     name: '',
@@ -109,10 +111,15 @@ export default function Projects() {
     const storageRef = ref(storage, `uploads/${user.uid}/${file.name}`);
 
     try {
-      const snapshot = await uploadBytes(storageRef, file);
+      // Add metadata when uploading
+      const snapshot = await uploadBytes(storageRef, file, {
+        customMetadata: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/octet-stream'
+        }
+      });
       const url = await getDownloadURL(snapshot.ref);
       
-      // Update newProject state with file info
       setNewProject(prev => ({
         ...prev,
         fileUrl: url,
@@ -234,8 +241,6 @@ export default function Projects() {
             </DialogTrigger>
             <DialogContent 
               className="bg-gray-900 border border-white/10 text-white max-h-[90vh] overflow-y-auto"
-              // Remove aria-hidden and use inert instead
-              inert={!isCreating ? "" : undefined}
             >
               <DialogHeader>
                 <DialogTitle>Create New Project</DialogTitle>
@@ -369,7 +374,8 @@ export default function Projects() {
             {projects.map((project) => (
               <Card
                 key={project.id}
-                className="bg-black/40 border-white/10 backdrop-blur-lg hover:border-white/20 transition-all group"
+                className="bg-black/40 border-white/10 backdrop-blur-lg hover:border-white/20 transition-all group cursor-pointer"
+                onClick={() => router.push(`/projects/${project.id}`)}
               >
                 <CardHeader>
                   <div className="flex justify-between items-start">
