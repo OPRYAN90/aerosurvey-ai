@@ -1,176 +1,154 @@
 "use client"
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { parse } from '@loaders.gl/core'
 import { LASLoader } from '@loaders.gl/las'
-import { load } from '@loaders.gl/core'
+import { Load } from '@loaders.gl/core'
 import { storage } from '@/lib/firebase'
-import { ref, getBlob } from 'firebase/storage'
+import { ref, getDownloadURL } from 'firebase/storage'
 
 interface LidarViewerProps {
-  fileUrl?: string  // Make fileUrl optional
+  fileUrl: string
 }
 
 export default function LidarViewer({ fileUrl }: LidarViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const sceneRef = useRef<THREE.Scene | null>(null)
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
-  const controlsRef = useRef<OrbitControls | null>(null)
-  const pointCloudRef = useRef<THREE.Points | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!containerRef.current || !fileUrl) return  // Add fileUrl check
+    if (!containerRef.current || !fileUrl) return
 
-    // Initialize Three.js scene
-    const scene = new THREE.Scene()
-    sceneRef.current = scene
-    scene.background = new THREE.Color(0x000000)
+    let scene: THREE.Scene
+    let camera: THREE.PerspectiveCamera
+    let renderer: THREE.WebGLRenderer
+    let controls: OrbitControls
+    let pointCloud: THREE.Points
 
-    // Initialize camera
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      containerRef.current.clientWidth / containerRef.current.clientHeight,
-      0.1,
-      1000
-    )
-    cameraRef.current = camera
-    camera.position.z = 5
-
-    // Initialize renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
-    rendererRef.current = renderer
-    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
-    containerRef.current.appendChild(renderer.domElement)
-
-    // Initialize controls
-    const controls = new OrbitControls(camera, renderer.domElement)
-    controlsRef.current = controls
-    controls.enableDamping = true
-    controls.dampingFactor = 0.05
-
-    // Modified Load LiDAR data function
-    const loadLidarData = async () => {
+    const init = async () => {
       try {
-        // Extract the path from the Firebase Storage URL
-        const storagePath = decodeURIComponent(fileUrl)
-          .split('/o/')[1]
-          ?.split('?')[0]
-          ?.replace(/%2F/g, '/');
+        // Initialize Three.js
+        scene = new THREE.Scene()
+        scene.background = new THREE.Color(0x000000)
 
-        if (!storagePath) {
-          throw new Error('Invalid storage path');
-        }
+        camera = new THREE.PerspectiveCamera(
+          75,
+          containerRef.current!.clientWidth / containerRef.current!.clientHeight,
+          0.1,
+          1000
+        )
+        camera.position.set(0, 0, 5)
 
-        // Get a reference to the file and download it as a blob
-        const fileRef = ref(storage, storagePath);
-        const blob = await getBlob(fileRef);
-        const arrayBuffer = await blob.arrayBuffer();
-        
-        // Parse LAS/LAZ file
-        const parsedData = await load(arrayBuffer, LASLoader, {
-          worker: true,
-          maxConcurrency: 4
-        });
-        
-        // Create geometry from parsed data
-        const geometry = new THREE.BufferGeometry();
-        
-        // Ensure positions exist and are in the correct format
-        if (!parsedData.attributes || !parsedData.attributes.POSITION) {
-          throw new Error('No position data found in LiDAR file');
-        }
-        
-        const positions = new Float32Array(parsedData.attributes.POSITION.value);
-        
-        // Handle colors if they exist, otherwise create default colors
-        let colors;
-        if (parsedData.attributes.COLOR_0) {
-          colors = new Float32Array(parsedData.attributes.COLOR_0.value);
-        } else {
-          // Create default color (white) for all points
-          colors = new Float32Array(positions.length);
-          for (let i = 0; i < colors.length; i++) {
-            colors[i] = 1.0; // White color (1.0, 1.0, 1.0)
+        renderer = new THREE.WebGLRenderer({ antialias: true })
+        renderer.setSize(containerRef.current!.clientWidth, containerRef.current!.clientHeight)
+        containerRef.current!.appendChild(renderer.domElement)
+
+        controls = new OrbitControls(camera, renderer.domElement)
+        controls.enableDamping = true
+
+        // Fetch and parse LiDAR data
+        const response = await fetch(fileUrl)
+        const arrayBuffer = await response.arrayBuffer()
+
+        const parsedData = await parse(arrayBuffer, LASLoader, {
+          laszip: {},
+          options: {
+            skip: 1,
+            maxPoints: 1000000
           }
+        })
+
+        // Create point cloud
+        const geometry = new THREE.BufferGeometry()
+        const positions = new Float32Array(parsedData.attributes.POSITION.value)
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+
+        // Color points based on elevation
+        const colors = new Float32Array(positions.length)
+        const color = new THREE.Color()
+        for (let i = 0; i < positions.length; i += 3) {
+          const elevation = positions[i + 2]
+          color.setHSL(0.6 - elevation * 0.5, 1.0, 0.5)
+          colors[i] = color.r
+          colors[i + 1] = color.g
+          colors[i + 2] = color.b
         }
-        
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        
-        // Create point cloud material with improved settings
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+
         const material = new THREE.PointsMaterial({
-          size: 0.005,
+          size: 0.01,
           vertexColors: true,
-          sizeAttenuation: true,
-          transparent: true,
-          opacity: 0.8
-        });
-        
-        // Remove existing point cloud if it exists
-        if (pointCloudRef.current) {
-          scene.remove(pointCloudRef.current);
-        }
-        
-        // Create and add new point cloud
-        const pointCloud = new THREE.Points(geometry, material);
-        pointCloudRef.current = pointCloud;
-        scene.add(pointCloud);
-        
-        // Center and scale view
-        const box = new THREE.Box3().setFromObject(pointCloud);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        
-        // Position camera to show full point cloud
-        const maxDim = Math.max(...size.toArray());
-        camera.position.copy(center);
-        camera.position.z += maxDim * 2;
-        controls.target.copy(center);
-        controls.update();
-        
-      } catch (error) {
-        console.error('Error loading LiDAR data:', error);
+          sizeAttenuation: true
+        })
+
+        pointCloud = new THREE.Points(geometry, material)
+        scene.add(pointCloud)
+
+        // Center camera on point cloud
+        const box = new THREE.Box3().setFromObject(pointCloud)
+        const center = box.getCenter(new THREE.Vector3())
+        const size = box.getSize(new THREE.Vector3())
+        const maxDim = Math.max(size.x, size.y, size.z)
+        camera.position.copy(center)
+        camera.position.z += maxDim * 2
+        controls.target.copy(center)
+
+        setIsLoading(false)
+      } catch (err: unknown) {
+        console.error('Error loading LiDAR data:', err)
+        setError(err instanceof Error ? err.message : 'An unknown error occurred')
+        setIsLoading(false)
       }
-    };
+    }
 
-    loadLidarData();
-
-    // Animation loop
     const animate = () => {
       requestAnimationFrame(animate)
-      controls.update()
-      renderer.render(scene, camera)
+      controls?.update()
+      renderer?.render(scene, camera)
     }
+
+    init()
     animate()
 
-    // Handle resize
     const handleResize = () => {
       if (!containerRef.current) return
-      const width = containerRef.current.clientWidth
-      const height = containerRef.current.clientHeight
-      
-      camera.aspect = width / height
+      camera.aspect = containerRef.current.clientWidth / containerRef.current.clientHeight
       camera.updateProjectionMatrix()
-      renderer.setSize(width, height)
+      renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
     }
+
     window.addEventListener('resize', handleResize)
 
-    // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize)
-      if (containerRef.current && renderer.domElement) {
+      if (containerRef.current && renderer) {
         containerRef.current.removeChild(renderer.domElement)
       }
-      renderer.dispose()
+      controls?.dispose()
+      renderer?.dispose()
     }
   }, [fileUrl])
 
-  if (!fileUrl) {
+  if (isLoading) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-black/40">
-        <p className="text-white/70">No file URL provided</p>
+        <div className="text-white space-y-2 text-center">
+          <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"/>
+          <p>Loading LiDAR data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-black/40">
+        <div className="text-red-500 space-y-2 text-center p-4">
+          <p className="font-semibold">Error loading LiDAR data</p>
+          <p className="text-sm text-white/70">{error}</p>
+        </div>
       </div>
     )
   }
