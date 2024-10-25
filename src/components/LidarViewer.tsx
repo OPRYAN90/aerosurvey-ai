@@ -45,6 +45,9 @@ export default function LidarViewer({ fileUrl, onError }: LidarViewerProps) {
   const isMountedRef = useRef(false)
   const [isInitialized, setIsInitialized] = useState(false)
 
+  // Add debug counter
+  const initAttempts = useRef(0)
+
   // Viewer control functions
   const zoomIn = useCallback(() => {
     if (cameraRef.current) {
@@ -89,84 +92,146 @@ export default function LidarViewer({ fileUrl, onError }: LidarViewerProps) {
     }
   }, [zoomIn, zoomOut, reset, toggleFullscreen])
 
-  // Scene setup effect
+  // Scene setup effect with improved logging
   useEffect(() => {
-    console.log('Initializing Three.js scene...')
-    if (!containerRef.current) {
-      console.log('Container ref not ready')
-      return
-    }
+    console.log('=== Scene Setup Start ===')
+    console.log('Initialization attempt:', ++initAttempts.current)
+    console.log('Container ref status:', {
+      exists: !!containerRef.current,
+      width: containerRef.current?.clientWidth,
+      height: containerRef.current?.clientHeight,
+      children: containerRef.current?.children.length
+    })
 
-    try {
-      // Scene setup
-      const scene = new THREE.Scene()
-      scene.background = new THREE.Color(0x000000)
-      sceneRef.current = scene
-      console.log('Scene created')
-
-      // Camera setup
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        containerRef.current.clientWidth / containerRef.current.clientHeight,
-        0.1,
-        2000
-      )
-      camera.position.set(0, 5, 10)
-      cameraRef.current = camera
-      initialCameraPositionRef.current = camera.position.clone()
-      console.log('Camera initialized')
-
-      // Renderer setup
-      const renderer = new THREE.WebGLRenderer({ 
-        antialias: true,
-        powerPreference: "high-performance"
-      })
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-      renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
-      containerRef.current.appendChild(renderer.domElement)
-      rendererRef.current = renderer
-      console.log('Renderer created')
-
-      // Controls setup
-      const controls = new OrbitControls(camera, renderer.domElement)
-      controls.enableDamping = true
-      controls.dampingFactor = 0.05
-      controls.screenSpacePanning = true
-      controls.minDistance = 0.1
-      controls.maxDistance = 1000
-      controlsRef.current = controls
-      console.log('Controls initialized')
-
-      // Animation loop
-      let animationFrameId: number
-      const animate = () => {
-        if (!isMountedRef.current) return
-        animationFrameId = requestAnimationFrame(animate)
-        controls.update()
-        renderer.render(scene, camera)
-      }
-      animate()
-
-      // Mark as initialized
-      setIsInitialized(true)
-      isMountedRef.current = true
-      console.log('Three.js initialization complete')
-
-      return () => {
-        console.log('Cleaning up Three.js resources')
-        isMountedRef.current = false
-        cancelAnimationFrame(animationFrameId)
-        controls.dispose()
-        renderer.dispose()
-        if (containerRef.current && renderer.domElement) {
-          containerRef.current.removeChild(renderer.domElement)
+    // Wait for container to be ready
+    if (!containerRef.current?.clientWidth) {
+      console.log('Container not ready, waiting...')
+      const checkContainer = setInterval(() => {
+        console.log('Checking container...', {
+          exists: !!containerRef.current,
+          width: containerRef.current?.clientWidth,
+          height: containerRef.current?.clientHeight
+        })
+        if (containerRef.current?.clientWidth) {
+          clearInterval(checkContainer)
+          initScene()
         }
-        setIsInitialized(false)
-      }
-    } catch (error) {
-      console.error('Error during Three.js initialization:', error)
-      onError?.(error instanceof Error ? error.message : 'Failed to initialize viewer')
+      }, 100)
+
+      return () => clearInterval(checkContainer)
     }
+
+    function initScene() {
+      try {
+        console.log('Starting scene initialization')
+        
+        // Clean up any existing scene
+        if (sceneRef.current || rendererRef.current) {
+          console.log('Cleaning up existing scene')
+          if (rendererRef.current) {
+            rendererRef.current.dispose()
+            containerRef.current?.removeChild(rendererRef.current.domElement)
+          }
+          sceneRef.current = null
+          rendererRef.current = null
+          cameraRef.current = null
+          controlsRef.current = null
+        }
+
+        // Scene setup
+        const scene = new THREE.Scene()
+        scene.background = new THREE.Color(0x000000)
+        sceneRef.current = scene
+        console.log('Scene created')
+
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(
+          75,
+          containerRef.current.clientWidth / containerRef.current.clientHeight,
+          0.1,
+          2000
+        )
+        camera.position.set(0, 5, 10)
+        cameraRef.current = camera
+        initialCameraPositionRef.current = camera.position.clone()
+        console.log('Camera initialized')
+
+        // Renderer setup
+        const renderer = new THREE.WebGLRenderer({ 
+          antialias: true,
+          powerPreference: "high-performance"
+        })
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+        renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
+        containerRef.current.appendChild(renderer.domElement)
+        rendererRef.current = renderer
+        console.log('Renderer created')
+
+        // Controls setup
+        const controls = new OrbitControls(camera, renderer.domElement)
+        controls.enableDamping = true
+        controls.dampingFactor = 0.05
+        controls.screenSpacePanning = true
+        controls.minDistance = 0.1
+        controls.maxDistance = 1000
+        controlsRef.current = controls
+        console.log('Controls initialized')
+
+        // Animation loop
+        let lastRender = 0
+        let frames = 0
+        let animationFrameId: number
+
+        const animate = (timestamp: number) => {
+          if (!isMountedRef.current) return
+          
+          frames++
+          if (timestamp - lastRender >= 1000) {
+            console.log(`FPS: ${frames}`)
+            frames = 0
+            lastRender = timestamp
+          }
+
+          animationFrameId = requestAnimationFrame(animate)
+          controls.update()
+          renderer.render(scene, camera)
+        }
+
+        console.log('Starting animation loop')
+        animationFrameId = requestAnimationFrame(animate)
+
+        // Mark as initialized
+        setIsInitialized(true)
+        isMountedRef.current = true
+        console.log('Three.js initialization complete')
+
+        return () => {
+          console.log('Cleaning up Three.js resources')
+          isMountedRef.current = false
+          cancelAnimationFrame(animationFrameId)
+          controls.dispose()
+          renderer.dispose()
+          if (containerRef.current && renderer.domElement) {
+            containerRef.current.removeChild(renderer.domElement)
+          }
+          setIsInitialized(false)
+        }
+      } catch (error) {
+        console.error('Error during scene initialization:', error)
+        console.error('Error details:', {
+          hasContainer: !!containerRef.current,
+          containerSize: {
+            width: containerRef.current?.clientWidth,
+            height: containerRef.current?.clientHeight
+          },
+          webglSupport: THREE.WEBGL.isWebGLAvailable(),
+          error: error instanceof Error ? error.message : error
+        })
+        onError?.(error instanceof Error ? error.message : 'Failed to initialize viewer')
+      }
+    }
+
+    initScene()
   }, [onError])
 
   // LiDAR data loading effect

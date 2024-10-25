@@ -206,7 +206,9 @@ export default function ProjectView() {
           </div>
         )}
         <div className="relative h-[calc(100vh-200px)] w-full bg-black/40 rounded-lg overflow-hidden">
-          {renderContent()}
+          <div className="w-full h-full" style={{ minHeight: '400px' }}>
+            {renderContent()}
+          </div>
         </div>
       </div>
     </div>
