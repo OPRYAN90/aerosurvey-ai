@@ -136,75 +136,89 @@ export default function LidarViewer({ fileUrl, onError }: LidarViewerProps) {
   // Store initial camera position for reset
   const initialCameraPosition = useRef<THREE.Vector3 | null>(null)
 
-  const containerRef = useCallback((node: HTMLDivElement | null) => {
-    if (node !== null) {
-      console.log('Creating Three.js context')
+  // Convert containerRef from callback to useRef
+  const containerRef = useRef<HTMLDivElement>(null)
 
-      const scene = new THREE.Scene()
-      scene.background = new THREE.Color(0x000000)
+  // Initialize Three.js context
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
 
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        node.clientWidth / node.clientHeight,
-        0.1,
-        2000
-      )
-      camera.position.set(0, 5, 10)
-      initialCameraPosition.current = camera.position.clone()
+    console.log('Creating Three.js context')
+    
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x000000)
 
-      const renderer = new THREE.WebGLRenderer({ 
-        antialias: true,
-        powerPreference: "high-performance"
-      })
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-      renderer.setSize(node.clientWidth, node.clientHeight)
-      node.appendChild(renderer.domElement)
+    // Create camera
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      2000
+    )
+    camera.position.set(0, 5, 10)
+    initialCameraPosition.current = camera.position.clone()
 
-      const controls = new OrbitControls(camera, renderer.domElement)
-      controls.enableDamping = true
-      controls.dampingFactor = 0.05
-      controls.screenSpacePanning = true
-      controls.minDistance = 0.1
-      controls.maxDistance = 1000
+    // Create renderer
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      powerPreference: "high-performance"
+    })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setSize(container.clientWidth, container.clientHeight)
+    container.appendChild(renderer.domElement)
 
-      // Add lights
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
-      scene.add(ambientLight)
+    // Create controls
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.enableDamping = true
+    controls.dampingFactor = 0.05
+    controls.screenSpacePanning = true
+    controls.minDistance = 0.1
+    controls.maxDistance = 1000
 
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-      directionalLight.position.set(1, 1, 1)
-      scene.add(directionalLight)
+    // Add lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+    scene.add(ambientLight)
 
-      const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222)
-      scene.add(gridHelper)
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
+    directionalLight.position.set(1, 1, 1)
+    scene.add(directionalLight)
 
-      let animationFrameId: number
+    const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222)
+    scene.add(gridHelper)
 
-      const animate = () => {
-        animationFrameId = requestAnimationFrame(animate)
-        controls.update()
-        renderer.render(scene, camera)
-      }
+    let animationFrameId: number
 
-      animate()
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate)
+      controls.update()
+      renderer.render(scene, camera)
+    }
 
-      const ctx: ThreeContext = {
-        scene,
-        camera,
-        renderer,
-        controls,
-        pointCloud: null,
-        dispose: () => {
-          cancelAnimationFrame(animationFrameId)
-          controls.dispose()
-          renderer.dispose()
-          if (node && renderer.domElement) {
-            node.removeChild(renderer.domElement)
-          }
+    animate()
+
+    const ctx: ThreeContext = {
+      scene,
+      camera,
+      renderer,
+      controls,
+      pointCloud: null,
+      dispose: () => {
+        cancelAnimationFrame(animationFrameId)
+        controls.dispose()
+        renderer.dispose()
+        if (container && renderer.domElement) {
+          container.removeChild(renderer.domElement)
         }
       }
+    }
 
-      setContext(ctx)
+    setContext(ctx)
+
+    return () => {
+      console.log('Disposing Three.js context')
+      ctx.dispose()
+      setContext(null)
     }
   }, [])
 
@@ -248,12 +262,16 @@ export default function LidarViewer({ fileUrl, onError }: LidarViewerProps) {
         // Parse LiDAR data
         console.log('Parsing LiDAR data...')
         const parsedData = await load(arrayBuffer, LASLoader, {
+          fetch: {
+            // @ts-ignore - loaders.gl internal fetch options type is incomplete
+            onProgress: (progressEvent: ProgressEvent) => {
+              const progress = progressEvent.loaded / progressEvent.total
+              setLoadingState(prev => ({ ...prev, progress }))
+            }
+          },
           las: {
             skip: arrayBuffer.byteLength > 100000000 ? 2 : 1,
             fp64: false
-          },
-          onProgress: (progress: number) => {
-            setLoadingState(prev => ({ ...prev, progress }))
           }
         })
 
