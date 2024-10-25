@@ -11,7 +11,8 @@ import {
   ZoomIn, 
   ZoomOut, 
   Maximize,
-  RotateCcw
+  RotateCcw,
+  AlertCircle
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -30,90 +31,158 @@ const LidarViewer = dynamic(() => import('@/components/LidarViewer'), {
 export default function ProjectView() {
   const { id } = useParams()
   const [project, setProject] = useState<Project | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [loadingState, setLoadingState] = useState({
+    isLoading: true,
+    error: null as string | null
+  })
 
   useEffect(() => {
     const fetchProject = async () => {
-      if (!id) return
+      if (!id) {
+        setLoadingState({
+          isLoading: false,
+          error: 'Project ID not found'
+        })
+        return
+      }
+
       try {
+        setLoadingState({ isLoading: true, error: null })
         const projectDoc = await getDoc(doc(db, 'projects', id as string))
-        if (projectDoc.exists()) {
-          setProject({ id: projectDoc.id, ...projectDoc.data() } as Project)
+        
+        if (!projectDoc.exists()) {
+          setLoadingState({
+            isLoading: false,
+            error: 'Project not found'
+          })
+          return
         }
+
+        const projectData = {
+          id: projectDoc.id,
+          ...projectDoc.data()
+        } as Project
+
+        if (!projectData.fileUrl) {
+          setLoadingState({
+            isLoading: false,
+            error: 'No LiDAR file associated with this project'
+          })
+          return
+        }
+
+        setProject(projectData)
+        setLoadingState({ isLoading: false, error: null })
+
       } catch (error) {
         console.error('Error fetching project:', error)
-      } finally {
-        setIsLoading(false)
+        setLoadingState({
+          isLoading: false,
+          error: error instanceof Error ? error.message : 'An unknown error occurred'
+        })
       }
     }
 
     fetchProject()
   }, [id])
 
+  const renderContent = () => {
+    if (loadingState.isLoading) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center space-y-4">
+            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"/>
+            <p className="text-white/70">Loading project...</p>
+          </div>
+        </div>
+      )
+    }
+
+    if (loadingState.error) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center space-y-4">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
+            <p className="text-red-500 font-semibold">{loadingState.error}</p>
+            <Button
+              variant="outline"
+              className="text-white border-white/10 hover:bg-white/10"
+              onClick={() => window.history.back()}
+            >
+              Back to Projects
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    if (!project?.fileUrl) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-white/50">No LiDAR data available</p>
+        </div>
+      )
+    }
+
+    return (
+      <>
+        <LidarViewer fileUrl={project.fileUrl} />
+        <div className="absolute top-4 right-4 flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="bg-black/50 hover:bg-black/70 text-white"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="bg-black/50 hover:bg-black/70 text-white"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="bg-black/50 hover:bg-black/70 text-white"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="bg-black/50 hover:bg-black/70 text-white"
+          >
+            <Maximize className="h-4 w-4" />
+          </Button>
+        </div>
+      </>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-14">
       <div className="p-5 space-y-4">
-        {/* Project Header */}
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-white">{project?.name}</h1>
-            <p className="text-white/70">
-              Material: {project?.material === 'custom' ? project?.customMaterial : project?.material}
-            </p>
-          </div>
-          
-          <Button
-            variant="outline"
-            className="text-white border-white/10 hover:bg-white/10"
-            onClick={() => window.history.back()}
-          >
-            Back to Projects
-          </Button>
-        </div>
-
-        {/* LiDAR Viewer Container */}
-        <div className="relative h-[calc(100vh-200px)] w-full bg-black/40 rounded-lg overflow-hidden">
-          {project?.fileUrl ? (
-            <>
-              <LidarViewer fileUrl={project.fileUrl} />
-              
-              {/* Viewer Controls */}
-              <div className="absolute top-4 right-4 flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-black/50 hover:bg-black/70 text-white"
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-black/50 hover:bg-black/70 text-white"
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-black/50 hover:bg-black/70 text-white"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-black/50 hover:bg-black/70 text-white"
-                >
-                  <Maximize className="h-4 w-4" />
-                </Button>
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-white/50">No LiDAR data available</p>
+        {project && (
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-white">{project.name}</h1>
+              <p className="text-white/70">
+                Material: {project.material === 'custom' ? project.customMaterial : project.material}
+              </p>
             </div>
-          )}
+            <Button
+              variant="outline"
+              className="text-white border-white/10 hover:bg-white/10"
+              onClick={() => window.history.back()}
+            >
+              Back to Projects
+            </Button>
+          </div>
+        )}
+        <div className="relative h-[calc(100vh-200px)] w-full bg-black/40 rounded-lg overflow-hidden">
+          {renderContent()}
         </div>
       </div>
     </div>

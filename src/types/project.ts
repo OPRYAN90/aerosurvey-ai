@@ -1,12 +1,12 @@
+// types/project.ts
 export interface Project {
   id?: string;
   name: string;
   material: string;
-  customMaterial: string;
-  materialCost: string;
-  file?: File | null;
-  fileUrl?: string;  // Make sure this is optional
+  customMaterial?: string;
+  materialCost?: string;
+  fileUrl?: string;
+  fileName?: string;
   userId?: string;
   createdAt?: string;
-  fileName?: string;
 }

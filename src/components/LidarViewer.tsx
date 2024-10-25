@@ -2,12 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { parse } from '@loaders.gl/core'
-import { LASLoader } from '@loaders.gl/las'
-import { Load } from '@loaders.gl/core'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader'
 import { storage } from '@/lib/firebase'
-import { ref, getDownloadURL } from 'firebase/storage'
+import { ref, getBlob } from 'firebase/storage'
 
 interface LidarViewerProps {
   fileUrl: string
@@ -15,139 +13,175 @@ interface LidarViewerProps {
 
 export default function LidarViewer({ fileUrl }: LidarViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadingState, setLoadingState] = useState<{
+    isLoading: boolean;
+    progress: number;
+    error: string | null;
+  }>({
+    isLoading: true,
+    progress: 0,
+    error: null
+  })
 
   useEffect(() => {
     if (!containerRef.current || !fileUrl) return
 
-    let scene: THREE.Scene
-    let camera: THREE.PerspectiveCamera
-    let renderer: THREE.WebGLRenderer
-    let controls: OrbitControls
-    let pointCloud: THREE.Points
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x000000)
+    
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      containerRef.current.clientWidth / containerRef.current.clientHeight,
+      0.1,
+      1000
+    )
+    camera.position.set(0, 5, 10)
 
-    const init = async () => {
+    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
+    containerRef.current.appendChild(renderer.domElement)
+
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.enableDamping = true
+
+    // Add ambient light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+    scene.add(ambientLight)
+
+    // Add directional light
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
+    directionalLight.position.set(1, 1, 1)
+    scene.add(directionalLight)
+
+    const loadLidarData = async () => {
       try {
-        // Initialize Three.js
-        scene = new THREE.Scene()
-        scene.background = new THREE.Color(0x000000)
+        setLoadingState(prev => ({ ...prev, isLoading: true, error: null }))
+        
+        // Get file path from Firebase URL
+        const storagePath = decodeURIComponent(fileUrl).split('/o/')[1]?.split('?')[0]
+        if (!storagePath) throw new Error('Invalid storage path')
 
-        camera = new THREE.PerspectiveCamera(
-          75,
-          containerRef.current!.clientWidth / containerRef.current!.clientHeight,
-          0.1,
-          1000
-        )
-        camera.position.set(0, 0, 5)
+        // Get blob from Firebase
+        const fileRef = ref(storage, storagePath)
+        const blob = await getBlob(fileRef)
+        const arrayBuffer = await blob.arrayBuffer()
 
-        renderer = new THREE.WebGLRenderer({ antialias: true })
-        renderer.setSize(containerRef.current!.clientWidth, containerRef.current!.clientHeight)
-        containerRef.current!.appendChild(renderer.domElement)
-
-        controls = new OrbitControls(camera, renderer.domElement)
-        controls.enableDamping = true
-
-        // Fetch and parse LiDAR data
-        const response = await fetch(fileUrl)
-        const arrayBuffer = await response.arrayBuffer()
-
-        const parsedData = await parse(arrayBuffer, LASLoader, {
-          laszip: {},
-          options: {
-            skip: 1,
-            maxPoints: 1000000
-          }
-        })
-
-        // Create point cloud
+        // Convert LAS/LAZ to PCD format (you'll need to implement this conversion)
+        // For now, we'll create a simple point cloud from the raw data
+        const points = new Float32Array(arrayBuffer.slice(0, 1000000)) // Limit size for testing
         const geometry = new THREE.BufferGeometry()
-        const positions = new Float32Array(parsedData.attributes.POSITION.value)
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+        
+        // Create positions from the raw data
+        const positions = []
+        for (let i = 0; i < points.length; i += 3) {
+          positions.push(points[i], points[i + 1], points[i + 2])
+        }
+        
+        geometry.setAttribute(
+          'position',
+          new THREE.Float32BufferAttribute(positions, 3)
+        )
 
-        // Color points based on elevation
+        // Create colors based on height
         const colors = new Float32Array(positions.length)
         const color = new THREE.Color()
         for (let i = 0; i < positions.length; i += 3) {
-          const elevation = positions[i + 2]
-          color.setHSL(0.6 - elevation * 0.5, 1.0, 0.5)
+          const height = positions[i + 2]
+          color.setHSL(0.6 - height * 0.5, 1.0, 0.5)
           colors[i] = color.r
           colors[i + 1] = color.g
           colors[i + 2] = color.b
         }
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
 
         const material = new THREE.PointsMaterial({
-          size: 0.01,
+          size: 0.02,
           vertexColors: true,
           sizeAttenuation: true
         })
 
-        pointCloud = new THREE.Points(geometry, material)
+        const pointCloud = new THREE.Points(geometry, material)
         scene.add(pointCloud)
 
-        // Center camera on point cloud
+        // Center and scale view
         const box = new THREE.Box3().setFromObject(pointCloud)
         const center = box.getCenter(new THREE.Vector3())
         const size = box.getSize(new THREE.Vector3())
-        const maxDim = Math.max(size.x, size.y, size.z)
+        
         camera.position.copy(center)
-        camera.position.z += maxDim * 2
+        camera.position.z += Math.max(...size.toArray()) * 2
         controls.target.copy(center)
+        controls.update()
 
-        setIsLoading(false)
-      } catch (err: unknown) {
-        console.error('Error loading LiDAR data:', err)
-        setError(err instanceof Error ? err.message : 'An unknown error occurred')
-        setIsLoading(false)
+        setLoadingState(prev => ({ ...prev, isLoading: false }))
+
+      } catch (error) {
+        console.error('Error loading LiDAR data:', error)
+        setLoadingState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: error instanceof Error ? error.message : 'An unknown error occurred'
+        }))
       }
     }
 
+    loadLidarData()
+
+    // Animation loop
     const animate = () => {
       requestAnimationFrame(animate)
-      controls?.update()
-      renderer?.render(scene, camera)
+      controls.update()
+      renderer.render(scene, camera)
     }
-
-    init()
     animate()
 
+    // Handle resize
     const handleResize = () => {
       if (!containerRef.current) return
       camera.aspect = containerRef.current.clientWidth / containerRef.current.clientHeight
       camera.updateProjectionMatrix()
       renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
     }
-
     window.addEventListener('resize', handleResize)
 
     return () => {
       window.removeEventListener('resize', handleResize)
-      if (containerRef.current && renderer) {
+      if (containerRef.current && renderer.domElement) {
         containerRef.current.removeChild(renderer.domElement)
       }
-      controls?.dispose()
-      renderer?.dispose()
+      renderer.dispose()
     }
   }, [fileUrl])
 
-  if (isLoading) {
+  if (loadingState.isLoading) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-black/40">
-        <div className="text-white space-y-2 text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"/>
-          <p>Loading LiDAR data...</p>
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"/>
+          <p className="text-white">Loading LiDAR data...</p>
+          {loadingState.progress > 0 && (
+            <p className="text-white/70">{Math.round(loadingState.progress * 100)}%</p>
+          )}
         </div>
       </div>
     )
   }
 
-  if (error) {
+  if (loadingState.error) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-black/40">
-        <div className="text-red-500 space-y-2 text-center p-4">
-          <p className="font-semibold">Error loading LiDAR data</p>
-          <p className="text-sm text-white/70">{error}</p>
+        <div className="text-center space-y-4 p-6">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-500 text-2xl">!</span>
+          </div>
+          <h3 className="text-red-500 font-semibold">Error Loading LiDAR Data</h3>
+          <p className="text-white/70 text-sm">{loadingState.error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     )
@@ -156,8 +190,8 @@ export default function LidarViewer({ fileUrl }: LidarViewerProps) {
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-      <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-md text-sm">
-        Click and drag to rotate • Scroll to zoom
+      <div className="absolute bottom-4 right-4 bg-black/50 text-white px-4 py-2 rounded-lg text-sm">
+        Use mouse to rotate • Scroll to zoom • Right-click to pan
       </div>
     </div>
   )
