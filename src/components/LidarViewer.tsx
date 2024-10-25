@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader'
 import { storage } from '@/lib/firebase'
 import { ref, getBlob } from 'firebase/storage'
 
@@ -11,24 +10,34 @@ interface LidarViewerProps {
   fileUrl: string
 }
 
+interface LoadingState {
+  isLoading: boolean
+  progress: number
+  error: string | null
+}
+
 export default function LidarViewer({ fileUrl }: LidarViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [loadingState, setLoadingState] = useState<{
-    isLoading: boolean;
-    progress: number;
-    error: string | null;
-  }>({
+  const sceneRef = useRef<THREE.Scene | null>(null)
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
+  const pointCloudRef = useRef<THREE.Points | null>(null)
+  
+  const [loadingState, setLoadingState] = useState<LoadingState>({
     isLoading: true,
     progress: 0,
     error: null
   })
 
+  // Setup Three.js scene
   useEffect(() => {
-    if (!containerRef.current || !fileUrl) return
+    if (!containerRef.current) return
 
+    // Initialize scene
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x000000)
-    
+    sceneRef.current = scene
+
+    // Initialize camera
     const camera = new THREE.PerspectiveCamera(
       75,
       containerRef.current.clientWidth / containerRef.current.clientHeight,
@@ -37,81 +46,110 @@ export default function LidarViewer({ fileUrl }: LidarViewerProps) {
     )
     camera.position.set(0, 5, 10)
 
+    // Initialize renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
     containerRef.current.appendChild(renderer.domElement)
+    rendererRef.current = renderer
 
+    // Add controls
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
 
-    // Add ambient light
+    // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
     scene.add(ambientLight)
 
-    // Add directional light
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
     directionalLight.position.set(1, 1, 1)
     scene.add(directionalLight)
+
+    // Animation loop
+    let animationFrameId: number
+
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate)
+      controls.update()
+      renderer.render(scene, camera)
+    }
+
+    animate()
+
+    // Cleanup
+    return () => {
+      cancelAnimationFrame(animationFrameId)
+      controls.dispose()
+      renderer.dispose()
+      if (containerRef.current && renderer.domElement) {
+        containerRef.current.removeChild(renderer.domElement)
+      }
+    }
+  }, [])
+
+  // Handle file loading
+  useEffect(() => {
+    if (!fileUrl || !sceneRef.current) return
 
     const loadLidarData = async () => {
       try {
         setLoadingState(prev => ({ ...prev, isLoading: true, error: null }))
         
-        // Get file path from Firebase URL
+        // Get file path
         const storagePath = decodeURIComponent(fileUrl).split('/o/')[1]?.split('?')[0]
         if (!storagePath) throw new Error('Invalid storage path')
 
-        // Get blob from Firebase
+        // Get file from Firebase
         const fileRef = ref(storage, storagePath)
         const blob = await getBlob(fileRef)
         const arrayBuffer = await blob.arrayBuffer()
 
-        // Convert LAS/LAZ to PCD format (you'll need to implement this conversion)
-        // For now, we'll create a simple point cloud from the raw data
-        const points = new Float32Array(arrayBuffer.slice(0, 1000000)) // Limit size for testing
-        const geometry = new THREE.BufferGeometry()
-        
-        // Create positions from the raw data
-        const positions = []
-        for (let i = 0; i < points.length; i += 3) {
-          positions.push(points[i], points[i + 1], points[i + 2])
+        // Remove existing point cloud if any
+        if (pointCloudRef.current) {
+          sceneRef.current.remove(pointCloudRef.current)
+          pointCloudRef.current.geometry.dispose()
+          pointCloudRef.current.material.dispose()
         }
-        
-        geometry.setAttribute(
-          'position',
-          new THREE.Float32BufferAttribute(positions, 3)
-        )
 
-        // Create colors based on height
-        const colors = new Float32Array(positions.length)
-        const color = new THREE.Color()
-        for (let i = 0; i < positions.length; i += 3) {
-          const height = positions[i + 2]
-          color.setHSL(0.6 - height * 0.5, 1.0, 0.5)
-          colors[i] = color.r
-          colors[i + 1] = color.g
-          colors[i + 2] = color.b
+        // Process point cloud data
+        const dataView = new DataView(arrayBuffer)
+        const points: number[] = []
+        const colors: number[] = []
+        
+        // Sample points from the buffer
+        for (let i = 0; i < Math.min(arrayBuffer.byteLength, 1000000); i += 12) {
+          if (i + 11 >= arrayBuffer.byteLength) break
+          
+          const x = dataView.getFloat32(i, true)
+          const y = dataView.getFloat32(i + 4, true)
+          const z = dataView.getFloat32(i + 8, true)
+          
+          if (isFinite(x) && isFinite(y) && isFinite(z)) {
+            points.push(x, y, z)
+            
+            // Generate color based on height
+            const normalizedHeight = (z + 10) / 20
+            const color = new THREE.Color()
+            color.setHSL(0.6 - normalizedHeight * 0.5, 1.0, 0.5)
+            colors.push(color.r, color.g, color.b)
+          }
         }
+
+        // Create geometry
+        const geometry = new THREE.BufferGeometry()
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3))
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
 
+        // Create material
         const material = new THREE.PointsMaterial({
           size: 0.02,
           vertexColors: true,
           sizeAttenuation: true
         })
 
+        // Create point cloud
         const pointCloud = new THREE.Points(geometry, material)
-        scene.add(pointCloud)
-
-        // Center and scale view
-        const box = new THREE.Box3().setFromObject(pointCloud)
-        const center = box.getCenter(new THREE.Vector3())
-        const size = box.getSize(new THREE.Vector3())
-        
-        camera.position.copy(center)
-        camera.position.z += Math.max(...size.toArray()) * 2
-        controls.target.copy(center)
-        controls.update()
+        sceneRef.current.add(pointCloud)
+        pointCloudRef.current = pointCloud
 
         setLoadingState(prev => ({ ...prev, isLoading: false }))
 
@@ -120,37 +158,14 @@ export default function LidarViewer({ fileUrl }: LidarViewerProps) {
         setLoadingState(prev => ({
           ...prev,
           isLoading: false,
-          error: error instanceof Error ? error.message : 'An unknown error occurred'
+          error: error instanceof Error 
+            ? error.message 
+            : 'Unable to load LiDAR data. Please try again later.'
         }))
       }
     }
 
     loadLidarData()
-
-    // Animation loop
-    const animate = () => {
-      requestAnimationFrame(animate)
-      controls.update()
-      renderer.render(scene, camera)
-    }
-    animate()
-
-    // Handle resize
-    const handleResize = () => {
-      if (!containerRef.current) return
-      camera.aspect = containerRef.current.clientWidth / containerRef.current.clientHeight
-      camera.updateProjectionMatrix()
-      renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
-    }
-    window.addEventListener('resize', handleResize)
-
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      if (containerRef.current && renderer.domElement) {
-        containerRef.current.removeChild(renderer.domElement)
-      }
-      renderer.dispose()
-    }
   }, [fileUrl])
 
   if (loadingState.isLoading) {

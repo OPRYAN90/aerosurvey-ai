@@ -49,6 +49,13 @@ export default function ProjectView() {
       try {
         setLoadingState({ isLoading: true, error: null })
         const projectDoc = await getDoc(doc(db, 'projects', id as string))
+          .catch(error => {
+            // Handle Firebase connection errors
+            if (error.code === 'failed-precondition' || error.name === 'FirebaseError') {
+              throw new Error('Unable to connect to database. Please check your connection and ensure no content blockers are active.')
+            }
+            throw error
+          })
         
         if (!projectDoc.exists()) {
           setLoadingState({
@@ -78,7 +85,9 @@ export default function ProjectView() {
         console.error('Error fetching project:', error)
         setLoadingState({
           isLoading: false,
-          error: error instanceof Error ? error.message : 'An unknown error occurred'
+          error: error instanceof Error 
+            ? error.message 
+            : 'Unable to load project. Please try again later.'
         })
       }
     }
