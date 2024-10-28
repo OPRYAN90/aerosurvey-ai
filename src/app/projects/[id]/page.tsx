@@ -114,16 +114,9 @@ export default function ProjectView() {
   }
 
   const renderContent = () => {
-    console.log('Rendering content:', {
-      isLoading: loadingState.isLoading,
-      error: loadingState.error,
-      hasProject: !!project,
-      fileUrl: project?.fileUrl
-    })
-    
     if (loadingState.isLoading) {
       return (
-        <div className="flex items-center justify-center h-full">
+        <div className="w-full h-full flex items-center justify-center">
           <div className="text-center space-y-4">
             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"/>
             <p className="text-white/70">Loading project...</p>
@@ -134,7 +127,7 @@ export default function ProjectView() {
 
     if (loadingState.error) {
       return (
-        <div className="flex items-center justify-center h-full">
+        <div className="w-full h-full flex items-center justify-center">
           <div className="text-center space-y-4">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
             <p className="text-red-500 font-semibold">{loadingState.error}</p>
@@ -152,14 +145,14 @@ export default function ProjectView() {
 
     if (!project?.fileUrl) {
       return (
-        <div className="flex items-center justify-center h-full">
+        <div className="w-full h-full flex items-center justify-center">
           <p className="text-white/50">No LiDAR data available</p>
         </div>
       )
     }
 
     return (
-      <div className="relative w-full h-full min-h-[400px]" ref={containerRef}>
+      <div className="relative w-full h-full" ref={containerRef}>
         <LidarViewer 
           fileUrl={project.fileUrl} 
           onError={handleViewerError}
@@ -215,13 +208,14 @@ export default function ProjectView() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-14">
-      <div className="p-5 space-y-4">
-        {project && (
-          <div className="flex justify-between items-start">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900">
+      {/* Project header - compact version */}
+      {project && (
+        <div className="fixed top-14 left-0 right-0 bg-black/50 backdrop-blur-sm z-10">
+          <div className="p-4 flex justify-between items-center max-w-7xl mx-auto">
             <div>
-              <h1 className="text-3xl font-bold text-white">{project.name}</h1>
-              <p className="text-white/70">
+              <h1 className="text-xl font-bold text-white">{project.name}</h1>
+              <p className="text-sm text-white/70">
                 Material: {project.material === 'custom' ? project.customMaterial : project.material}
               </p>
             </div>
@@ -233,10 +227,12 @@ export default function ProjectView() {
               Back to Projects
             </Button>
           </div>
-        )}
-        <div className="relative h-[calc(100vh-200px)] w-full bg-black/40 rounded-lg overflow-hidden">
-          {renderContent()}
         </div>
+      )}
+
+      {/* LiDAR viewer container - takes full remaining height */}
+      <div className="fixed top-[104px] left-0 right-0 bottom-0">
+        {renderContent()}
       </div>
     </div>
   )
