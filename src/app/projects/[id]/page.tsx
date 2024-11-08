@@ -15,9 +15,9 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
-// Import LidarViewer with NoSSR and loading component
-const LidarViewer = dynamic(
-  () => import('@/components/LidarViewer'),
+// Import PotreeViewer with NoSSR
+const PotreeViewer = dynamic(
+  () => import('@/components/PotreeViewer'),
   { 
     ssr: false,
     loading: () => (
@@ -153,8 +153,8 @@ export default function ProjectView() {
 
     return (
       <div className="relative w-full h-full" ref={containerRef}>
-        <LidarViewer 
-          fileUrl={project.fileUrl} 
+        <PotreeViewer 
+          project={project}
           onError={handleViewerError}
         />
         <div className="absolute top-4 right-4 flex gap-2">
