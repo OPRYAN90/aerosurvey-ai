@@ -9,8 +9,10 @@ export interface Project {
   fileName?: string;
   userId?: string;
   createdAt?: string;
-  convertedUrl?: string; // URL to the converted Potree format
-  processingStatus?: 'pending' | 'converting' | 'ready' | 'error';
+  conversionStatus?: 'pending' | 'converting' | 'converted' | 'error';
+  convertedUrl?: string;
+  conversionProgress?: number;
+  conversionError?: string;
 }
 
 export interface PointCloudData {

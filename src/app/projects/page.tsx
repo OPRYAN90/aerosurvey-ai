@@ -39,6 +39,10 @@ interface Project {
   userId?: string
   createdAt?: string
   fileName?: string
+  conversionStatus?: 'pending' | 'converting' | 'converted' | 'error';
+  convertedUrl?: string;
+  conversionProgress?: number;
+  conversionError?: string;
 }
 
 const defaultMaterials = [
@@ -158,10 +162,28 @@ export default function Projects() {
         fileUrl: newProject.fileUrl,
         fileName: newProject.fileName,
         userId: user.uid,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        conversionStatus: 'pending',
+        conversionProgress: 0
       };
 
       const docRef = await addDoc(collection(db, 'projects'), projectData);
+      
+      const response = await fetch('/api/convert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileUrl: newProject.fileUrl,
+          projectId: docRef.id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Conversion failed to start');
+      }
+
       setProjects([...projects, { ...projectData, id: docRef.id }]);
       setIsCreating(false);
       setNewProject({

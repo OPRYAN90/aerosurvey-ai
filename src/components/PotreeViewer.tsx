@@ -16,6 +16,8 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   useEffect(() => {
     const loadDependencies = async () => {
       try {
+        console.log('Starting to load dependencies...');
+        
         // Load CSS first with updated paths
         await loadStyles([
           '/potree/libs/jquery-ui/jquery-ui.min.css',
@@ -23,17 +25,33 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           '/potree/build/potree/potree.css'
         ]);
 
-        // Load scripts in correct order with updated paths
-        await loadScripts([
+        // Updated script list with LAZ workers
+        const scripts = [
+          // Core dependencies
           '/potree/libs/jquery/jquery-3.1.1.min.js',
+          '/potree/libs/three.js/build/three.min.js',
+          '/potree/libs/other/BinaryHeap.js',
+          '/potree/libs/tween/tween.min.js',
           '/potree/libs/proj4/proj4.js',
           '/potree/libs/jquery-ui/jquery-ui.min.js',
-          '/potree/libs/three.js/build/three.min.js',
-          '/potree/libs/stats.js/stats.min.js',
+          '/potree/libs/other/stats.min.js',
           '/potree/libs/spectrum/spectrum.js',
-          '/potree/libs/jstree/jstree.js',
+          
+          // LAZ dependencies
+          '/potree/libs/plasio/js/laslaz.js',
+          '/potree/libs/plasio/vendor/bluebird.js',
+          '/potree/libs/plasio/workers/laz-perf.js',
+          '/potree/libs/plasio/workers/laz-loader-worker.js',
+          
+          // Main Potree library
           '/potree/build/potree/potree.js'
-        ]);
+        ];
+
+        for (const script of scripts) {
+          console.log(`Loading script: ${script}`);
+          await loadScript(script);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
 
         console.log('All dependencies loaded successfully');
         setIsDependenciesLoaded(true);
@@ -59,31 +77,36 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
         console.log('Initializing Potree viewer...');
         
-        // Initialize viewer
-        // @ts-ignore
-        const viewer = new Potree.Viewer(containerRef.current);
-        viewerRef.current = viewer;
+        if (!window.Potree) {
+          throw new Error('Potree not initialized');
+        }
 
-        // Configure viewer
-        viewer.setEDLEnabled(true);
-        viewer.setFOV(60);
-        viewer.setPointBudget(1_000_000);
-        viewer.setBackground('rgb(32, 32, 32)');
+        // Updated viewer initialization with better defaults
+        const viewer = new window.Potree.Viewer(containerRef.current, {
+          useDefaultRenderLoop: true,
+          pointBudget: 1_000_000,
+          fov: 60,
+          edlEnabled: true,
+          background: 'rgb(32, 32, 32)',
+          description: '',
+          useEDL: true
+        });
+
+        viewerRef.current = viewer;
 
         console.log('Loading point cloud:', project.fileUrl);
         
         // Load point cloud data
-        // @ts-ignore
-        Potree.loadPointCloud(project.fileUrl, project.name, (e: any) => {
+        window.Potree.loadPointCloud(project.fileUrl, project.name, (e: any) => {
           const pointcloud = e.pointcloud;
           viewer.scene.addPointCloud(pointcloud);
 
           // Configure point cloud appearance
           pointcloud.material.size = 1;
-          // @ts-ignore
-          pointcloud.material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
-          // @ts-ignore
-          pointcloud.material.shape = Potree.PointShape.SQUARE;
+          pointcloud.material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
+          pointcloud.material.shape = window.Potree.PointShape.SQUARE;
+          pointcloud.material.pointColorType = window.Potree.PointColorType.RGB;
+          pointcloud.material.pointShape = window.Potree.PointShape.SQUARE;
 
           viewer.fitToScreen();
           setIsLoading(false);
@@ -126,25 +149,21 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     await Promise.all(promises);
   };
 
-  const loadScripts = async (urls: string[]) => {
-    for (const url of urls) {
-      await new Promise<void>((resolve, reject) => {
-        if (document.querySelector(`script[src="${url}"]`)) {
-          resolve();
-          return;
-        }
+  const loadScript = (url: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${url}"]`)) {
+        resolve();
+        return;
+      }
 
-        const script = document.createElement('script');
-        script.src = url;
-        script.async = false;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
-        document.body.appendChild(script);
-      });
-
-      // Add a small delay between script loads
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.src = url;
+      script.async = false;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
+      document.body.appendChild(script);
+    });
   };
 
   return (
