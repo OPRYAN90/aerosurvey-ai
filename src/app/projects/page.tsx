@@ -27,6 +27,7 @@ import { db } from '@/lib/firebase'
 import { collection, addDoc, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { useAuth } from '@/contexts/auth-context'
 import { useRouter } from 'next/navigation'
+import { ConversionService } from '@/lib/conversion-service'
 
 interface Project {
   id?: string
@@ -149,12 +150,11 @@ export default function Projects() {
 
   const handleCreateProject = async () => {
     try {
-      console.log('Starting project creation:', {
-        projectName: newProject.name,
-        fileName: newProject.fileName,
-        fileUrl: newProject.fileUrl
-      });
-
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      console.log('Got auth token');
+      
       const projectData = {
         name: newProject.name,
         material: newProject.material,
@@ -164,42 +164,20 @@ export default function Projects() {
         fileName: newProject.fileName,
         userId: user.uid,
         createdAt: new Date().toISOString(),
-        conversionStatus: 'pending',
+        conversionStatus: 'pending' as const,
         conversionProgress: 0
       };
 
-      console.log('Creating Firestore document with data:', projectData);
+      console.log('Creating project document:', projectData);
       const docRef = await addDoc(collection(db, 'projects'), projectData);
-      
       console.log('Project document created:', docRef.id);
-
-      console.log('Starting conversion process:', {
-        fileUrl: newProject.fileUrl,
-        projectId: docRef.id
-      });
-
-      const response = await fetch('/api/convert', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fileUrl: newProject.fileUrl,
-          projectId: docRef.id
-        })
-      });
-
-      console.log('Conversion API response:', {
-        status: response.status,
-        statusText: response.statusText
-      });
-
-      const responseData = await response.json();
-      console.log('Conversion API response data:', responseData);
-
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Conversion failed to start');
-      }
+      
+      console.log('Starting conversion process');
+      await ConversionService.startConversion(
+        { ...projectData, id: docRef.id },
+        token
+      );
+      console.log('Conversion started successfully');
 
       setProjects([...projects, { ...projectData, id: docRef.id }]);
       setIsCreating(false);
@@ -211,7 +189,11 @@ export default function Projects() {
         file: null,
       });
     } catch (error) {
-      console.error('Error creating project:', error);
+      console.error('Project creation error:', {
+        error,
+        stack: error instanceof Error ? error.stack : undefined,
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
       throw error;
     }
   };

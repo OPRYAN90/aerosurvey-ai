@@ -3,7 +3,7 @@ import { db } from '@/lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 
 export class ConversionService {
-  static async startConversion(project: Project): Promise<void> {
+  static async startConversion(project: Project, authToken: string): Promise<void> {
     if (!project.id || !project.fileUrl) {
       throw new Error('Missing required project information');
     }
@@ -13,41 +13,58 @@ export class ConversionService {
       fileUrl: project.fileUrl
     });
 
-    const response = await fetch('/api/convert', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileUrl: project.fileUrl,
-        projectId: project.id
-      })
-    });
+    try {
+      const response = await fetch('/api/convert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          fileUrl: project.fileUrl,
+          projectId: project.id
+        })
+      });
 
-    const data = await response.json();
+      // Log the raw response
+      console.log('API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
 
-    if (!response.ok) {
-      console.error('Conversion failed:', data);
-      throw new Error(data.error || 'Failed to start conversion');
+      // Get response text first
+      const text = await response.text();
+      console.log('Response text:', text);
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        throw new Error(`Invalid response from server: ${text}`);
+      }
+
+      if (!response.ok) {
+        console.error('Conversion failed:', data);
+        throw new Error(data.error || 'Failed to start conversion');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Conversion error:', error);
+      throw error;
     }
-
-    return data;
   }
 
   static watchConversionStatus(
     projectId: string,
     onUpdate: (project: Partial<Project>) => void
   ) {
-    console.log('Starting conversion watch for:', projectId);
-    
     return onSnapshot(
       doc(db, 'projects', projectId),
       (snapshot) => {
         const data = snapshot.data() as Project;
-        console.log('Conversion status update:', {
-          projectId,
-          status: data.conversionStatus,
-          progress: data.conversionProgress
-        });
-        
         onUpdate({
           conversionStatus: data.conversionStatus,
           conversionProgress: data.conversionProgress,
