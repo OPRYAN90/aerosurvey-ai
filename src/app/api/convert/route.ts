@@ -29,23 +29,14 @@ export async function POST(request: Request) {
   let converter: ChildProcess | undefined;
 
   try {
-    // Validate admin is initialized
-    console.log('Route handler starting');
-    
-    // Check Firebase Admin initialization
-    if (!adminStorage || !adminDb) {
-      console.error('Firebase Admin not initialized');
-      throw new Error('Internal server configuration error');
-    }
-
-    // Log environment state
-    console.log('Environment check:', {
-      hasStorage: !!adminStorage,
-      bucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      converterPath: process.env.POTREE_CONVERTER_PATH
-    });
-
     console.log('API: Starting conversion request');
+
+    // Add logging for the environment
+    console.log('Environment check:', {
+      tempDir: os.tmpdir(),
+      converterPath: process.env.POTREE_CONVERTER_PATH,
+      cwd: process.cwd()
+    });
 
     // Verify storage
     const bucket = adminStorage.bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
@@ -72,38 +63,35 @@ export async function POST(request: Request) {
       throw new Error('Missing required fields: fileUrl or projectId');
     }
 
-    // Verify PotreeConverter
-    const converterPath = process.env.POTREE_CONVERTER_PATH;
-    if (!converterPath) {
-      throw new Error('POTREE_CONVERTER_PATH not configured');
-    }
-
-    await fs.access(converterPath)
-      .catch(() => {
-        throw new Error('PotreeConverter not found at: ' + converterPath);
-      });
-
     // Create temp directories
     tempDir = path.join(os.tmpdir(), `conversion-${projectId}`);
     const inputPath = path.join(tempDir, 'input.laz');
     const outputPath = path.join(tempDir, 'output');
 
+    // Ensure directories exist
     await fs.mkdir(tempDir, { recursive: true });
     await fs.mkdir(outputPath, { recursive: true });
 
-    // Update initial status
-    await updateConversionProgress(projectId, 0);
-
-    // Download file
-    console.log('Downloading file from:', fileUrl);
+    // Download file with better error handling
+    console.log('Downloading file:', fileUrl);
     const response = await fetch(fileUrl);
     if (!response.ok) {
       throw new Error(`Failed to download file: ${response.statusText}`);
     }
 
-    const buffer = await response.arrayBuffer();
-    await fs.writeFile(inputPath, Buffer.from(buffer));
-    await updateConversionProgress(projectId, 20);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await fs.writeFile(inputPath, buffer);
+
+    // Verify file was written
+    const stats = await fs.stat(inputPath);
+    console.log('Input file stats:', {
+      size: stats.size,
+      path: inputPath,
+      isFile: stats.isFile()
+    });
+
+    // Update initial status
+    await updateConversionProgress(projectId, 0);
 
     // Run conversion
     console.log('Starting PotreeConverter');
@@ -111,7 +99,7 @@ export async function POST(request: Request) {
       let stdoutData = '';
       let stderrData = '';
 
-      converter = spawn(converterPath, [
+      converter = spawn(process.env.POTREE_CONVERTER_PATH, [
         inputPath,
         '-o', outputPath,
         '--overwrite',
@@ -153,18 +141,22 @@ export async function POST(request: Request) {
 
     await updateConversionProgress(projectId, 60);
 
-    // Upload converted files
+    // Upload converted files with verification
     console.log('Uploading converted files');
     const files = await fs.readdir(outputPath);
 
     for (const file of files) {
       const filePath = path.join(outputPath, file);
-      await bucket.upload(filePath, {
-        destination: `converted/${projectId}/${file}`,
-        metadata: {
-          contentType: 'application/octet-stream'
-        }
-      });
+      const fileStats = await fs.stat(filePath);
+      
+      if (fileStats.isFile()) {  // Only upload files, not directories
+        await bucket.upload(filePath, {
+          destination: `converted/${projectId}/${file}`,
+          metadata: {
+            contentType: 'application/octet-stream'
+          }
+        });
+      }
     }
 
     await updateConversionProgress(projectId, 80);
@@ -189,9 +181,10 @@ export async function POST(request: Request) {
       convertedUrl: url
     });
 
-  } catch (error: unknown) {
-    console.error('Conversion failed:', {
+  } catch (error) {
+    console.error('Conversion error:', {
       error,
+      tempDir,
       projectId,
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined
@@ -215,7 +208,6 @@ export async function POST(request: Request) {
     }, { 
       status: 500 
     });
-
   } finally {
     // Cleanup
     if (converter && !converter.killed) {
