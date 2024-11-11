@@ -1,70 +1,89 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getStorage } from 'firebase-admin/storage';
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
-
-// Initialize Firebase Admin if not already initialized
-if (!getApps().length) {
-  initializeApp({
-    credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS || '{}')),
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-  });
-}
+import { adminStorage, adminDb } from '@/lib/firebase-admin';
 
 async function updateConversionProgress(
   projectId: string,
   progress: number,
   status: 'pending' | 'converting' | 'converted' | 'error' = 'converting'
-): Promise<void> {
-  await updateDoc(doc(db, 'projects', projectId), {
-    conversionStatus: status,
-    conversionProgress: progress
-  });
+) {
+  try {
+    await adminDb.collection('projects').doc(projectId).update({
+      conversionStatus: status,
+      conversionProgress: progress
+    });
+  } catch (error) {
+    console.error('Error updating progress:', error);
+  }
 }
+
+export const runtime = 'nodejs' // Force Node.js runtime
 
 export async function POST(request: Request) {
   let projectId: string | undefined;
   let tempDir: string | undefined;
+  let converter: ChildProcess | undefined;
 
   try {
-    console.log('API: Received request');
+    // Validate admin is initialized
+    console.log('Route handler starting');
+    
+    // Check Firebase Admin initialization
+    if (!adminStorage || !adminDb) {
+      console.error('Firebase Admin not initialized');
+      throw new Error('Internal server configuration error');
+    }
 
+    // Log environment state
+    console.log('Environment check:', {
+      hasStorage: !!adminStorage,
+      bucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      converterPath: process.env.POTREE_CONVERTER_PATH
+    });
+
+    console.log('API: Starting conversion request');
+
+    // Verify storage
+    const bucket = adminStorage.bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+    console.log('Storage initialization check:', {
+      bucketName: bucket.name,
+      exists: await bucket.exists().then(([exists]) => exists)
+    });
+
+    // Auth check
     const authHeader = request.headers.get('authorization');
-    console.log('Auth header:', authHeader);
-
     if (!authHeader?.startsWith('Bearer ')) {
       throw new Error('Invalid authorization header');
     }
 
-    if (!process.env.POTREE_CONVERTER_PATH) {
-      throw new Error('POTREE_CONVERTER_PATH environment variable is not set');
-    }
-
     const token = authHeader.split('Bearer ')[1];
-    try {
-      const decodedToken = await getAuth().verifyIdToken(token);
-      console.log('Token verified for user:', decodedToken.uid);
-    } catch (error) {
-      console.error('Token verification failed:', error);
-      throw new Error('Invalid authentication token');
-    }
+    const decodedToken = await getAuth().verifyIdToken(token);
+    console.log('Auth verified for user:', decodedToken.uid);
 
-    const body = await request.json();
-    console.log('Request body:', body);
-
-    const { fileUrl, projectId: id } = body;
+    // Get request data
+    const { fileUrl, projectId: id } = await request.json();
     projectId = id;
 
     if (!fileUrl || !projectId) {
-      throw new Error('Missing required fields');
+      throw new Error('Missing required fields: fileUrl or projectId');
     }
 
+    // Verify PotreeConverter
+    const converterPath = process.env.POTREE_CONVERTER_PATH;
+    if (!converterPath) {
+      throw new Error('POTREE_CONVERTER_PATH not configured');
+    }
+
+    await fs.access(converterPath)
+      .catch(() => {
+        throw new Error('PotreeConverter not found at: ' + converterPath);
+      });
+
+    // Create temp directories
     tempDir = path.join(os.tmpdir(), `conversion-${projectId}`);
     const inputPath = path.join(tempDir, 'input.laz');
     const outputPath = path.join(tempDir, 'output');
@@ -72,41 +91,70 @@ export async function POST(request: Request) {
     await fs.mkdir(tempDir, { recursive: true });
     await fs.mkdir(outputPath, { recursive: true });
 
+    // Update initial status
+    await updateConversionProgress(projectId, 0);
+
+    // Download file
+    console.log('Downloading file from:', fileUrl);
     const response = await fetch(fileUrl);
     if (!response.ok) {
-      throw new Error(`Failed to fetch file: ${response.statusText}`);
+      throw new Error(`Failed to download file: ${response.statusText}`);
     }
 
     const buffer = await response.arrayBuffer();
-    if (buffer.byteLength === 0) {
-      throw new Error('Empty file received');
-    }
-
     await fs.writeFile(inputPath, Buffer.from(buffer));
+    await updateConversionProgress(projectId, 20);
 
+    // Run conversion
+    console.log('Starting PotreeConverter');
     await new Promise<void>((resolve, reject) => {
-      const converter: ChildProcess = spawn(process.env.POTREE_CONVERTER_PATH!, [
+      let stdoutData = '';
+      let stderrData = '';
+
+      converter = spawn(converterPath, [
         inputPath,
         '-o', outputPath,
         '--overwrite',
         '--generate-page', 'false'
-      ]);
+      ], {
+        windowsHide: true,
+        env: process.env
+      });
 
-      converter.stdout.on('data', (data) => {
+      converter.stdout?.on('data', (data) => {
+        stdoutData += data.toString();
         console.log('Converter output:', data.toString());
       });
 
-      converter.stderr.on('data', (data) => {
+      converter.stderr?.on('data', (data) => {
+        stderrData += data.toString();
         console.error('Converter error:', data.toString());
       });
 
-      converter.on('close', (code: number | null) => {
-        if (code === 0) resolve();
-        else reject(new Error(`Conversion failed with code ${code}`));
+      converter.on('error', (error) => {
+        console.error('Spawn error:', error);
+        reject(new Error(`Failed to start converter: ${error.message}`));
+      });
+
+      converter.on('close', (code: number | null, signal: string | null) => {
+        if (code === 0) {
+          console.log('Conversion completed successfully');
+          resolve();
+        } else {
+          reject(new Error(
+            `Conversion failed with code ${code}. ` +
+            `Signal: ${signal}. ` +
+            `Stdout: ${stdoutData}. ` +
+            `Stderr: ${stderrData}`
+          ));
+        }
       });
     });
 
-    const bucket = getStorage().bucket();
+    await updateConversionProgress(projectId, 60);
+
+    // Upload converted files
+    console.log('Uploading converted files');
     const files = await fs.readdir(outputPath);
 
     for (const file of files) {
@@ -119,53 +167,71 @@ export async function POST(request: Request) {
       });
     }
 
+    await updateConversionProgress(projectId, 80);
+
+    // Get signed URL
     const [url] = await bucket
       .file(`converted/${projectId}/cloud.js`)
-      .getSignedUrl({ action: 'read', expires: '03-01-2500' });
+      .getSignedUrl({
+        action: 'read',
+        expires: '03-01-2500'
+      });
 
-    await updateDoc(doc(db, 'projects', projectId), {
-      convertedUrl: url,
-      conversionStatus: 'converted' as const
+    // Update final status
+    await updateConversionProgress(projectId, 100, 'converted');
+    await adminDb.collection('projects').doc(projectId).update({
+      convertedUrl: url
     });
 
-    if (!url) {
-      throw new Error('No URL generated for converted file');
+    console.log('Conversion process completed successfully');
+    return NextResponse.json({
+      success: true,
+      convertedUrl: url
+    });
+
+  } catch (error: unknown) {
+    console.error('Conversion failed:', {
+      error,
+      projectId,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
+    if (projectId) {
+      await updateConversionProgress(
+        projectId,
+        0,
+        'error'
+      );
+      await adminDb.collection('projects').doc(projectId).update({
+        conversionError: error instanceof Error ? error.message : 'Unknown error'
+      }).catch(err => console.error('Failed to update error status:', err));
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      convertedUrl: url 
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-  } catch (error) {
-    console.error('API Error:', {
-      message: error.message,
-      stack: error.stack,
-      projectId
-    });
-
-    const errorResponse = {
+    return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
       details: error instanceof Error ? error.stack : undefined
-    };
-
-    console.log('Sending error response:', errorResponse);
-
-    return NextResponse.json(errorResponse, { 
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    }, { 
+      status: 500 
     });
+
   } finally {
+    // Cleanup
+    if (converter && !converter.killed) {
+      try {
+        converter.kill();
+      } catch (err) {
+        console.error('Error killing converter process:', err);
+      }
+    }
+
     if (tempDir) {
-      await fs.rm(tempDir, { recursive: true, force: true })
-        .catch(err => console.error('Cleanup error:', err));
+      try {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      } catch (err) {
+        console.error('Error cleaning up temp directory:', err);
+      }
     }
   }
-} 
+}

@@ -26,23 +26,31 @@ export class ConversionService {
         })
       });
 
-      // Log the raw response
+      // Log full response info
       console.log('API Response:', {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries())
       });
 
-      // Get response text first
+      const contentType = response.headers.get('content-type');
       const text = await response.text();
-      console.log('Response text:', text);
+
+      // Check if response is HTML (error page)
+      if (contentType?.includes('text/html')) {
+        console.error('Received HTML response:', text.substring(0, 200));
+        throw new Error('Received HTML error page from server');
+      }
 
       let data;
       try {
         data = JSON.parse(text);
       } catch (e) {
-        console.error('Failed to parse response:', e);
-        throw new Error(`Invalid response from server: ${text}`);
+        console.error('Failed to parse response:', {
+          error: e,
+          text: text.substring(0, 200)
+        });
+        throw new Error(`Invalid JSON response: ${text.substring(0, 100)}...`);
       }
 
       if (!response.ok) {
@@ -52,7 +60,14 @@ export class ConversionService {
 
       return data;
     } catch (error) {
-      console.error('Conversion error:', error);
+      console.error('Conversion error:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        project: {
+          id: project.id,
+          url: project.fileUrl
+        }
+      });
       throw error;
     }
   }
