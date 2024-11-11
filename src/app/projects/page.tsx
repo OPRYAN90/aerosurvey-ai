@@ -148,12 +148,13 @@ export default function Projects() {
   };
 
   const handleCreateProject = async () => {
-    if (!user || !newProject.fileUrl) {
-      console.error('No user or file URL found');
-      return;
-    }
-
     try {
+      console.log('Starting project creation:', {
+        projectName: newProject.name,
+        fileName: newProject.fileName,
+        fileUrl: newProject.fileUrl
+      });
+
       const projectData = {
         name: newProject.name,
         material: newProject.material,
@@ -167,8 +168,16 @@ export default function Projects() {
         conversionProgress: 0
       };
 
+      console.log('Creating Firestore document with data:', projectData);
       const docRef = await addDoc(collection(db, 'projects'), projectData);
       
+      console.log('Project document created:', docRef.id);
+
+      console.log('Starting conversion process:', {
+        fileUrl: newProject.fileUrl,
+        projectId: docRef.id
+      });
+
       const response = await fetch('/api/convert', {
         method: 'POST',
         headers: {
@@ -180,8 +189,16 @@ export default function Projects() {
         })
       });
 
+      console.log('Conversion API response:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+
+      const responseData = await response.json();
+      console.log('Conversion API response data:', responseData);
+
       if (!response.ok) {
-        throw new Error('Conversion failed to start');
+        throw new Error(responseData.error || 'Conversion failed to start');
       }
 
       setProjects([...projects, { ...projectData, id: docRef.id }]);
@@ -195,6 +212,7 @@ export default function Projects() {
       });
     } catch (error) {
       console.error('Error creating project:', error);
+      throw error;
     }
   };
 

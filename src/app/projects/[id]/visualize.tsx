@@ -6,9 +6,8 @@ import dynamic from 'next/dynamic';
 import { Project } from '@/types/project';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { PotreeService } from '@/lib/potree-service';
+import { ConversionService } from '@/lib/conversion-service';
 
-// Import PotreeViewer dynamically to avoid SSR issues
 const PotreeViewer = dynamic(
   () => import('@/components/PotreeViewer'),
   { ssr: false }
@@ -19,13 +18,14 @@ export default function VisualizePage() {
   const [project, setProject] = useState<Project | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [conversionStatus, setConversionStatus] = useState<Project['conversionStatus']>();
+  const [conversionProgress, setConversionProgress] = useState<number>(0);
 
   useEffect(() => {
     const loadProject = async () => {
       if (!params.id) return;
 
       try {
-        console.log('Loading project:', params.id);
         const projectDoc = await getDoc(doc(db, 'projects', params.id as string));
         
         if (!projectDoc.exists()) {
@@ -33,16 +33,30 @@ export default function VisualizePage() {
         }
 
         const projectData = { id: projectDoc.id, ...projectDoc.data() } as Project;
-        
-        // Check if we need to convert the file
-        if (projectData.fileUrl && !projectData.convertedUrl) {
-          console.log('Converting file to Potree format...');
-          await PotreeService.convertToPointCloud(projectData);
+        setProject(projectData);
+
+        const unsubscribe = ConversionService.watchConversionStatus(
+          projectData.id!,
+          (updates) => {
+            setConversionStatus(updates.conversionStatus);
+            setConversionProgress(updates.conversionProgress || 0);
+            
+            if (updates.convertedUrl) {
+              setProject(prev => prev ? { ...prev, convertedUrl: updates.convertedUrl } : null);
+            }
+            
+            if (updates.conversionError) {
+              setError(updates.conversionError);
+            }
+          }
+        );
+
+        if (projectData.fileUrl && !projectData.convertedUrl && projectData.conversionStatus !== 'converting') {
+          await ConversionService.startConversion(projectData);
         }
 
-        setProject(projectData);
+        return unsubscribe;
       } catch (error) {
-        console.error('Error loading project:', error);
         setError(error instanceof Error ? error.message : 'Failed to load project');
       } finally {
         setIsLoading(false);
