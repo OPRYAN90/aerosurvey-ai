@@ -60,7 +60,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
     const initViewer = async () => {
       try {
-        console.log('Initializing viewer with metadata URL:', project.convertedUrl);
+        console.log('Initializing viewer with URL:', project.convertedUrl);
         
         if (!window.Potree) {
           throw new Error('Potree not initialized');
@@ -77,21 +77,18 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
         viewerRef.current = viewer;
 
-        window.Potree.loadPointCloud(
-          project.convertedUrl,
-          project.name || 'point cloud', 
-          (e: any) => {
-            console.log('Point cloud loaded:', e);
-            const pointcloud = e.pointcloud;
-            viewer.scene.addPointCloud(pointcloud);
+        window.Potree.loadPointCloud(project.convertedUrl, project.name || 'point cloud', (e: any) => {
+          console.log('Point cloud loaded:', e);
+          const pointcloud = e.pointcloud;
+          viewer.scene.addPointCloud(pointcloud);
 
-            pointcloud.material.size = 1;
-            pointcloud.material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
-            pointcloud.material.shape = window.Potree.PointShape.SQUARE;
-            pointcloud.material.pointColorType = window.Potree.PointColorType.RGB;
+          pointcloud.material.size = 1;
+          pointcloud.material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
+          pointcloud.material.shape = window.Potree.PointShape.SQUARE;
+          pointcloud.material.pointColorType = window.Potree.PointColorType.RGB;
 
-            viewer.fitToScreen();
-            setIsLoading(false);
+          viewer.fitToScreen();
+          setIsLoading(false);
         });
       } catch (error) {
         console.error('Error initializing viewer:', error);
