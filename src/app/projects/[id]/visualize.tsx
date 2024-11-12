@@ -52,7 +52,9 @@ export default function VisualizePage() {
         );
 
         if (projectData.fileUrl && !projectData.convertedUrl && projectData.conversionStatus !== 'converting') {
-          await ConversionService.startConversion(projectData);
+          await ConversionService.startConversion(projectData, (progress) => {
+            setConversionProgress(progress);
+          });
         }
 
         return unsubscribe;

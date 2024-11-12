@@ -12,22 +12,18 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isDependenciesLoaded, setIsDependenciesLoaded] = useState(false);
 
-  // Step 1: Load all required dependencies
   useEffect(() => {
     const loadDependencies = async () => {
       try {
         console.log('Starting to load dependencies...');
         
-        // Load CSS first with updated paths
         await loadStyles([
           '/potree/libs/jquery-ui/jquery-ui.min.css',
           '/potree/libs/spectrum/spectrum.css',
           '/potree/build/potree/potree.css'
         ]);
 
-        // Updated script list with LAZ workers
         const scripts = [
-          // Core dependencies
           '/potree/libs/jquery/jquery-3.1.1.min.js',
           '/potree/libs/three.js/build/three.min.js',
           '/potree/libs/other/BinaryHeap.js',
@@ -36,20 +32,13 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           '/potree/libs/jquery-ui/jquery-ui.min.js',
           '/potree/libs/other/stats.min.js',
           '/potree/libs/spectrum/spectrum.js',
-          
-          // LAZ dependencies
-          '/potree/libs/plasio/js/laslaz.js',
-          '/potree/libs/plasio/vendor/bluebird.js',
-          '/potree/libs/plasio/workers/laz-perf.js',
-          '/potree/libs/plasio/workers/laz-loader-worker.js',
-          
-          // Main Potree library
           '/potree/build/potree/potree.js'
         ];
 
         for (const script of scripts) {
           console.log(`Loading script: ${script}`);
           await loadScript(script);
+          // Small delay between scripts
           await new Promise(resolve => setTimeout(resolve, 100));
         }
 
@@ -64,52 +53,45 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     loadDependencies();
   }, [onError]);
 
-  // Step 2: Initialize viewer after dependencies are loaded
   useEffect(() => {
-    if (!isDependenciesLoaded || !containerRef.current || !project.fileUrl) return;
+    if (!isDependenciesLoaded || !containerRef.current || !project.convertedUrl) {
+      return;
+    }
 
     const initViewer = async () => {
       try {
-        // Ensure container has dimensions
-        if (!containerRef.current?.clientWidth) {
-          throw new Error('Container not ready');
-        }
-
-        console.log('Initializing Potree viewer...');
+        console.log('Initializing viewer with metadata URL:', project.convertedUrl);
         
         if (!window.Potree) {
           throw new Error('Potree not initialized');
         }
 
-        // Updated viewer initialization with better defaults
         const viewer = new window.Potree.Viewer(containerRef.current, {
           useDefaultRenderLoop: true,
           pointBudget: 1_000_000,
           fov: 60,
           edlEnabled: true,
           background: 'rgb(32, 32, 32)',
-          description: '',
           useEDL: true
         });
 
         viewerRef.current = viewer;
 
-        console.log('Loading point cloud:', project.fileUrl);
-        
-        // Load point cloud data
-        window.Potree.loadPointCloud(project.fileUrl, project.name, (e: any) => {
-          const pointcloud = e.pointcloud;
-          viewer.scene.addPointCloud(pointcloud);
+        window.Potree.loadPointCloud(
+          project.convertedUrl,
+          project.name || 'point cloud', 
+          (e: any) => {
+            console.log('Point cloud loaded:', e);
+            const pointcloud = e.pointcloud;
+            viewer.scene.addPointCloud(pointcloud);
 
-          // Configure point cloud appearance
-          pointcloud.material.size = 1;
-          pointcloud.material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
-          pointcloud.material.shape = window.Potree.PointShape.SQUARE;
-          pointcloud.material.pointColorType = window.Potree.PointColorType.RGB;
-          pointcloud.material.pointShape = window.Potree.PointShape.SQUARE;
+            pointcloud.material.size = 1;
+            pointcloud.material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
+            pointcloud.material.shape = window.Potree.PointShape.SQUARE;
+            pointcloud.material.pointColorType = window.Potree.PointColorType.RGB;
 
-          viewer.fitToScreen();
-          setIsLoading(false);
+            viewer.fitToScreen();
+            setIsLoading(false);
         });
       } catch (error) {
         console.error('Error initializing viewer:', error);
@@ -117,7 +99,6 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
       }
     };
 
-    // Wait for next frame to ensure container is ready
     requestAnimationFrame(() => {
       initViewer();
     });
@@ -127,7 +108,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         viewerRef.current.dispose();
       }
     };
-  }, [isDependenciesLoaded, project, onError]);
+  }, [isDependenciesLoaded, project.convertedUrl, project.name, onError]);
 
   const loadStyles = async (urls: string[]) => {
     const promises = urls.map(url => {

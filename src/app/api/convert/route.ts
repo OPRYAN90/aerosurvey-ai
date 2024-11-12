@@ -31,21 +31,7 @@ export async function POST(request: Request) {
   try {
     console.log('API: Starting conversion request');
 
-    // Add logging for the environment
-    console.log('Environment check:', {
-      tempDir: os.tmpdir(),
-      converterPath: process.env.POTREE_CONVERTER_PATH,
-      cwd: process.cwd()
-    });
-
-    // Verify storage
-    const bucket = adminStorage.bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
-    console.log('Storage initialization check:', {
-      bucketName: bucket.name,
-      exists: await bucket.exists().then(([exists]) => exists)
-    });
-
-    // Auth check
+    // Auth check and request data parsing
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       throw new Error('Invalid authorization header');
@@ -55,7 +41,6 @@ export async function POST(request: Request) {
     const decodedToken = await getAuth().verifyIdToken(token);
     console.log('Auth verified for user:', decodedToken.uid);
 
-    // Get request data
     const { fileUrl, projectId: id } = await request.json();
     projectId = id;
 
@@ -63,16 +48,23 @@ export async function POST(request: Request) {
       throw new Error('Missing required fields: fileUrl or projectId');
     }
 
-    // Create temp directories
+    // Create temp directories with new structure
     tempDir = path.join(os.tmpdir(), `conversion-${projectId}`);
+    const baseOutputPath = path.join(tempDir, 'output');
+    const pointcloudsPath = path.join(baseOutputPath, 'pointclouds');
     const inputPath = path.join(tempDir, 'input.laz');
-    const outputPath = path.join(tempDir, 'output');
 
-    // Ensure directories exist
-    await fs.mkdir(tempDir, { recursive: true });
-    await fs.mkdir(outputPath, { recursive: true });
+    console.log('Directory setup:', {
+      baseOutputPath,
+      pointcloudsPath,
+      converterPath: process.env.POTREE_CONVERTER_PATH
+    });
 
-    // Download file with better error handling
+    // Create directories
+    await fs.mkdir(baseOutputPath, { recursive: true });
+    await fs.mkdir(pointcloudsPath, { recursive: true });
+
+    // Download file
     console.log('Downloading file:', fileUrl);
     const response = await fetch(fileUrl);
     if (!response.ok) {
@@ -82,26 +74,22 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await response.arrayBuffer());
     await fs.writeFile(inputPath, buffer);
 
-    // Verify file was written
-    const stats = await fs.stat(inputPath);
-    console.log('Input file stats:', {
-      size: stats.size,
-      path: inputPath,
-      isFile: stats.isFile()
-    });
-
-    // Update initial status
-    await updateConversionProgress(projectId, 0);
+    // Update progress
+    await updateConversionProgress(projectId, 20);
 
     // Run conversion
-    console.log('Starting PotreeConverter');
+    console.log('Running PotreeConverter with paths:', {
+      input: inputPath,
+      output: baseOutputPath
+    });
+
     await new Promise<void>((resolve, reject) => {
       let stdoutData = '';
       let stderrData = '';
 
-      converter = spawn(process.env.POTREE_CONVERTER_PATH, [
+      converter = spawn(process.env.POTREE_CONVERTER_PATH!, [
         inputPath,
-        '-o', outputPath,
+        '-o', baseOutputPath,
         '--overwrite',
         '--generate-page', 'false'
       ], {
@@ -139,47 +127,52 @@ export async function POST(request: Request) {
       });
     });
 
-    await updateConversionProgress(projectId, 60);
-
-    // Upload converted files with verification
-    console.log('Uploading converted files');
-    const files = await fs.readdir(outputPath);
-
-    for (const file of files) {
-      const filePath = path.join(outputPath, file);
-      const fileStats = await fs.stat(filePath);
-      
-      if (fileStats.isFile()) {  // Only upload files, not directories
-        await bucket.upload(filePath, {
-          destination: `converted/${projectId}/${file}`,
-          metadata: {
-            contentType: 'application/octet-stream'
-          }
-        });
-      }
+    // Verify converted files
+    const potreeOutputPath = path.join(pointcloudsPath, projectId);
+    const requiredFiles = ['metadata.json', 'hierarchy.bin', 'octree.bin'];
+    console.log('Verifying converted files...');
+    
+    for (const file of requiredFiles) {
+      const filePath = path.join(potreeOutputPath, file);
+      const exists = await fs.access(filePath).then(() => true).catch(() => false);
+      console.log(`File ${file}: ${exists ? 'Found' : 'Missing'}`);
+      if (!exists) throw new Error(`Required file ${file} not found after conversion`);
     }
 
-    await updateConversionProgress(projectId, 80);
+    // Upload files
+    const bucket = adminStorage.bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+    console.log('Uploading converted files to Firebase');
+    await updateConversionProgress(projectId, 60);
 
-    // Get signed URL
+    for (const file of requiredFiles) {
+      const filePath = path.join(potreeOutputPath, file);
+      const destination = `converted/${projectId}/${file}`;
+      
+      console.log(`Uploading ${file} to ${destination}`);
+      
+      await bucket.upload(filePath, {
+        destination,
+        metadata: {
+          contentType: file.endsWith('.json') ? 
+                      'application/json' : 'application/octet-stream'
+        }
+      });
+    }
+
+    // Get metadata.json URL
     const [url] = await bucket
-      .file(`converted/${projectId}/cloud.js`)
+      .file(`converted/${projectId}/metadata.json`)
       .getSignedUrl({
         action: 'read',
         expires: '03-01-2500'
       });
 
-    // Update final status
     await updateConversionProgress(projectId, 100, 'converted');
     await adminDb.collection('projects').doc(projectId).update({
       convertedUrl: url
     });
 
-    console.log('Conversion process completed successfully');
-    return NextResponse.json({
-      success: true,
-      convertedUrl: url
-    });
+    return NextResponse.json({ success: true, convertedUrl: url });
 
   } catch (error) {
     console.error('Conversion error:', {
