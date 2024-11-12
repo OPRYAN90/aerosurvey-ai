@@ -23,6 +23,41 @@ async function updateConversionProgress(
 
 export const runtime = 'nodejs' // Force Node.js runtime
 
+async function validateConversion(projectId: string, bucket: any) {
+  const requiredFiles = [
+    'metadata.json',
+    'hierarchy.bin',
+    'octree.bin'
+  ];
+
+  console.log('Validating conversion for project:', projectId);
+
+  // Check each file exists and is accessible
+  for (const file of requiredFiles) {
+    const [exists] = await bucket
+      .file(`converted/${projectId}/${file}`)
+      .exists();
+    
+    const [metadata] = await bucket
+      .file(`converted/${projectId}/${file}`)
+      .getMetadata();
+    
+    console.log(`File ${file}:`, {
+      exists,
+      size: metadata.size,
+      contentType: metadata.contentType
+    });
+  }
+
+  // Try to fetch metadata.json content
+  const [metadataContent] = await bucket
+    .file(`converted/${projectId}/metadata.json`)
+    .download();
+  
+  const metadata = JSON.parse(metadataContent.toString());
+  console.log('Metadata content:', metadata);
+}
+
 export async function POST(request: Request) {
   let projectId: string | undefined;
   let tempDir: string | undefined;
@@ -176,6 +211,12 @@ export async function POST(request: Request) {
 
     await updateConversionProgress(projectId, 80);
 
+    // Add file listing check
+    const [files] = await bucket.getFiles({
+      prefix: `converted/${projectId}/`
+    });
+    console.log('Files in storage:', files.map(file => file.name));
+
     // Get signed URL for metadata.json
     const [url] = await bucket
       .file(`converted/${projectId}/metadata.json`)
@@ -183,6 +224,9 @@ export async function POST(request: Request) {
         action: 'read',
         expires: '03-01-2500'
       });
+
+    // Add validation check
+    await validateConversion(projectId, bucket);
 
     // Update final status
     await updateConversionProgress(projectId, 100, 'converted');

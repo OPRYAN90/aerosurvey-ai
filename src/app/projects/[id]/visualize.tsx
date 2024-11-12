@@ -68,6 +68,39 @@ export default function VisualizePage() {
     loadProject();
   }, [params.id]);
 
+  useEffect(() => {
+    const testFiles = async () => {
+      if (project?.convertedUrl) {
+        try {
+          // Test metadata.json
+          const metadataResponse = await fetch(project.convertedUrl);
+          console.log('Metadata file access:', {
+            status: metadataResponse.status,
+            type: metadataResponse.headers.get('content-type'),
+            data: await metadataResponse.json()
+          });
+
+          // Try to access hierarchy and octree
+          const baseUrl = project.convertedUrl.replace('metadata.json', '');
+          const files = ['hierarchy.bin', 'octree.bin'];
+          
+          for (const file of files) {
+            const response = await fetch(`${baseUrl}${file}`);
+            console.log(`${file} access:`, {
+              status: response.status,
+              type: response.headers.get('content-type'),
+              size: response.headers.get('content-length')
+            });
+          }
+        } catch (error) {
+          console.error('File access test failed:', error);
+        }
+      }
+    };
+
+    testFiles();
+  }, [project?.convertedUrl]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900">

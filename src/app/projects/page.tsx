@@ -24,7 +24,7 @@ import {
 import { storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL, deleteObject, ref as storageRef } from 'firebase/storage'
 import { db } from '@/lib/firebase'
-import { collection, addDoc, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore'
+import { collection, addDoc, getDocs, query, where, deleteDoc, doc, getDoc } from 'firebase/firestore'
 import { useAuth } from '@/contexts/auth-context'
 import { useRouter } from 'next/navigation'
 import { ConversionService } from '@/lib/conversion-service'
@@ -171,6 +171,12 @@ export default function Projects() {
       console.log('Creating project document:', projectData);
       const docRef = await addDoc(collection(db, 'projects'), projectData);
       console.log('Project document created:', docRef.id);
+      
+      console.log('Checking project status:', {
+        projectId: docRef.id,
+        data: await getDoc(doc(db, 'projects', docRef.id))
+          .then(doc => doc.data())
+      });
       
       console.log('Starting conversion process');
       await ConversionService.startConversion(
