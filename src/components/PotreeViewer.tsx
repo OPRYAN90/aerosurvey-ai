@@ -158,6 +158,53 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     });
   };
 
+  const testStorageAccess = async (projectId: string) => {
+    const files = ['metadata.json', 'hierarchy.bin', 'octree.bin'];
+    
+    for (const file of files) {
+      const url = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${projectId}/${file}`;
+      try {
+        const response = await fetch(url);
+        console.log(`Testing ${file}:`, {
+          status: response.status,
+          ok: response.ok,
+          contentType: response.headers.get('content-type')
+        });
+        
+        if (file === 'metadata.json') {
+          const text = await response.text();
+          console.log('Metadata content:', text.substring(0, 200)); // First 200 chars
+        }
+      } catch (error) {
+        console.error(`Error testing ${file}:`, error);
+      }
+    }
+  };
+
+  const testAccess = async () => {
+    if (!project?.id) return;
+    
+    const url = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
+    try {
+      const response = await fetch(url);
+      const text = await response.text();
+      console.log({
+        status: response.status,
+        content: text.substring(0, 100),
+        headers: Object.fromEntries([...response.headers])
+      });
+    } catch (error) {
+      console.error('Error testing access:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (project?.id) {
+      testStorageAccess(project.id);
+      testAccess();
+    }
+  }, [project?.id]);
+
   return (
     <div className="relative w-full h-full min-h-[600px]">
       <div 
