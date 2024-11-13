@@ -13,6 +13,33 @@ const PotreeViewer = dynamic(
   { ssr: false }
 );
 
+function ConversionProgress({ progress, status }: { progress: number; status?: string }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-50">
+      <div className="w-64 text-center space-y-4">
+        <div className="relative w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div 
+            className="absolute left-0 top-0 h-full bg-blue-500 transition-all duration-300"
+            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+          />
+        </div>
+        <div className="text-white space-y-1">
+          <p className="font-medium">Converting Project</p>
+          <p className="text-sm text-white/70">
+            {status === 'converting' 
+              ? `${Math.round(progress)}% complete`
+              : status === 'pending'
+              ? 'Preparing conversion...'
+              : status === 'error'
+              ? 'Conversion failed'
+              : 'Processing...'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function VisualizePage() {
   const params = useParams();
   const [project, setProject] = useState<Project | null>(null);
@@ -34,6 +61,8 @@ export default function VisualizePage() {
 
         const projectData = { id: projectDoc.id, ...projectDoc.data() } as Project;
         setProject(projectData);
+        setConversionStatus(projectData.conversionStatus);
+        setConversionProgress(projectData.conversionProgress || 0);
 
         const unsubscribe = ConversionService.watchConversionStatus(
           projectData.id!,
@@ -52,10 +81,16 @@ export default function VisualizePage() {
         );
 
         if (projectData.fileUrl && !projectData.convertedUrl && projectData.conversionStatus !== 'converting') {
-          // @ts-ignore
-          await ConversionService.startConversion(projectData, (progress) => {
-            setConversionProgress(progress);
-          });
+          setConversionStatus('pending');
+          try {
+            // @ts-ignore
+            await ConversionService.startConversion(projectData, (progress) => {
+              setConversionProgress(progress);
+            });
+          } catch (error) {
+            setConversionStatus('error');
+            setError(error instanceof Error ? error.message : 'Conversion failed');
+          }
         }
 
         return unsubscribe;
@@ -131,11 +166,28 @@ export default function VisualizePage() {
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-14">
       <div className="p-5">
         <h1 className="text-2xl font-bold text-white mb-4">{project.name}</h1>
-        <div className="bg-black/40 rounded-lg overflow-hidden h-[calc(100vh-12rem)]">
-          <PotreeViewer 
-            project={project}
-            onError={setError}
-          />
+        <div className="relative bg-black/40 rounded-lg overflow-hidden h-[calc(100vh-12rem)]">
+          {(conversionStatus === 'converting' || conversionStatus === 'pending') && (
+            <ConversionProgress 
+              progress={conversionProgress} 
+              status={conversionStatus}
+            />
+          )}
+          
+          {project.convertedUrl ? (
+            <PotreeViewer 
+              project={project}
+              onError={setError}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-white/70">
+                {conversionStatus === 'error' 
+                  ? 'Failed to convert project'
+                  : 'Converting project...'}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
