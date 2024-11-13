@@ -11,6 +11,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   const viewerRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDependenciesLoaded, setIsDependenciesLoaded] = useState(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     const loadDependencies = async () => {
@@ -70,6 +71,12 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           throw new Error('Potree not initialized');
         }
 
+        // Set a timeout for loading
+        loadingTimeoutRef.current = setTimeout(() => {
+          onError?.('Loading timeout - viewer took too long to initialize');
+          setIsLoading(false);
+        }, 30000); // 30 second timeout
+
         const viewer = new window.Potree.Viewer(containerRef.current, {
           useDefaultRenderLoop: true,
           pointBudget: 1_000_000,
@@ -82,48 +89,68 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         viewerRef.current = viewer;
 
         window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
-          console.log('Point cloud loaded:', e);
-          const pointcloud = e.pointcloud;
-          viewer.scene.addPointCloud(pointcloud);
-
-          const material = pointcloud.material;
-          material.size = 1;
-          material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
-          material.shape = window.Potree.PointShape.SQUARE;
-          
-          try {
-            if (!window.Potree.PointColorType) {
-              console.warn('PointColorType not available, defaulting to RGB');
-              material.pointColorType = 0; // RGB is typically 0
-              return;
-            }
-
-            if (pointcloud.hasRGB) {
-              material.pointColorType = window.Potree.PointColorType.RGB;
-            } else if (pointcloud.intensity) {
-              material.pointColorType = window.Potree.PointColorType.INTENSITY;
-            } else {
-              material.pointColorType = window.Potree.PointColorType.HEIGHT;
-            }
-          } catch (error) {
-            console.warn('Error setting color type:', error);
-            material.pointColorType = 0; // RGB
+          // Clear timeout since point cloud loaded
+          if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current);
           }
 
-          viewer.fitToScreen();
-          setIsLoading(false);
+          if (!e || !e.pointcloud) {
+            throw new Error('Invalid point cloud data received');
+          }
+
+          console.log('Point cloud loaded:', e);
+          const pointcloud = e.pointcloud;
+          
+          try {
+            viewer.scene.addPointCloud(pointcloud);
+
+            const material = pointcloud.material;
+            material.size = 1;
+            material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
+            material.shape = window.Potree.PointShape.SQUARE;
+            
+            // Simplified color type setting
+            if (pointcloud.hasRGB) {
+              material.pointColorType = 0; // RGB
+              console.log('Using RGB coloring');
+            } else if (pointcloud.intensity) {
+              material.pointColorType = 1; // Intensity
+              console.log('Using intensity coloring');
+            } else {
+              material.pointColorType = 2; // Height
+              console.log('Using height coloring');
+            }
+
+            // Force a render update
+            viewer.scene.dispatchEvent({ type: 'point_cloud_loaded' });
+            
+            // Small delay before fitToScreen to ensure proper initialization
+            setTimeout(() => {
+              viewer.fitToScreen();
+              setIsLoading(false);
+            }, 100);
+
+          } catch (error) {
+            console.error('Error configuring point cloud:', error);
+            onError?.(error instanceof Error ? error.message : 'Failed to configure point cloud');
+            setIsLoading(false);
+          }
         });
       } catch (error) {
         console.error('Error initializing viewer:', error);
         onError?.(error instanceof Error ? error.message : 'Failed to initialize viewer');
+        setIsLoading(false);
       }
     };
 
-    requestAnimationFrame(() => {
-      initViewer();
-    });
+    initViewer();
 
     return () => {
+      // Clear any pending timeouts
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+      // Dispose of viewer
       if (viewerRef.current) {
         viewerRef.current.dispose();
       }
@@ -166,53 +193,6 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
       document.body.appendChild(script);
     });
   };
-
-  const testStorageAccess = async (projectId: string) => {
-    const files = ['metadata.json', 'hierarchy.bin', 'octree.bin'];
-    
-    for (const file of files) {
-      const url = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${projectId}/${file}`;
-      try {
-        const response = await fetch(url);
-        console.log(`Testing ${file}:`, {
-          status: response.status,
-          ok: response.ok,
-          contentType: response.headers.get('content-type')
-        });
-        
-        if (file === 'metadata.json') {
-          const text = await response.text();
-          console.log('Metadata content:', text.substring(0, 200)); // First 200 chars
-        }
-      } catch (error) {
-        console.error(`Error testing ${file}:`, error);
-      }
-    }
-  };
-
-  const testAccess = async () => {
-    if (!project?.id) return;
-    
-    const url = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
-    try {
-      const response = await fetch(url);
-      const text = await response.text();
-      console.log({
-        status: response.status,
-        content: text.substring(0, 100),
-        headers: Object.fromEntries([...response.headers])
-      });
-    } catch (error) {
-      console.error('Error testing access:', error);
-    }
-  };
-
-  useEffect(() => {
-    if (project?.id) {
-      testStorageAccess(project.id);
-      testAccess();
-    }
-  }, [project?.id]);
 
   return (
     <div className="relative w-full h-full min-h-[600px]">

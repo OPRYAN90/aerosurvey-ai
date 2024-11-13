@@ -52,6 +52,7 @@ export default function VisualizePage() {
         );
 
         if (projectData.fileUrl && !projectData.convertedUrl && projectData.conversionStatus !== 'converting') {
+          // @ts-ignore
           await ConversionService.startConversion(projectData, (progress) => {
             setConversionProgress(progress);
           });
