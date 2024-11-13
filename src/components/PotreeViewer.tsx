@@ -60,7 +60,8 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
     const initViewer = async () => {
       try {
-        console.log('Initializing viewer with URL:', project.convertedUrl);
+        const publicUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
+        console.log('Initializing viewer with URL:', publicUrl);
         
         if (!window.Potree) {
           throw new Error('Potree not initialized');
@@ -77,15 +78,28 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
         viewerRef.current = viewer;
 
-        window.Potree.loadPointCloud(project.convertedUrl, project.name || 'point cloud', (e: any) => {
+        window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
           console.log('Point cloud loaded:', e);
           const pointcloud = e.pointcloud;
           viewer.scene.addPointCloud(pointcloud);
 
-          pointcloud.material.size = 1;
-          pointcloud.material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
-          pointcloud.material.shape = window.Potree.PointShape.SQUARE;
-          pointcloud.material.pointColorType = window.Potree.PointColorType.RGB;
+          const material = pointcloud.material;
+          material.size = 1;
+          material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
+          material.shape = window.Potree.PointShape.SQUARE;
+          
+          try {
+            if (pointcloud.hasRGB) {
+              material.pointColorType = window.Potree.PointColorType.RGB;
+            } else if (pointcloud.intensity) {
+              material.pointColorType = window.Potree.PointColorType.INTENSITY;
+            } else {
+              material.pointColorType = window.Potree.PointColorType.HEIGHT;
+            }
+          } catch (error) {
+            console.warn('Error setting color type, falling back to HEIGHT:', error);
+            material.pointColorType = window.Potree.PointColorType.HEIGHT;
+          }
 
           viewer.fitToScreen();
           setIsLoading(false);
@@ -105,7 +119,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         viewerRef.current.dispose();
       }
     };
-  }, [isDependenciesLoaded, project.convertedUrl, project.name, onError]);
+  }, [isDependenciesLoaded, project.convertedUrl, project.id, project.name, onError]);
 
   const loadStyles = async (urls: string[]) => {
     const promises = urls.map(url => {
