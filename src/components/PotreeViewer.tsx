@@ -38,8 +38,11 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         for (const script of scripts) {
           console.log(`Loading script: ${script}`);
           await loadScript(script);
-          // Small delay between scripts
-          await new Promise(resolve => setTimeout(resolve, 100));
+          if (script.includes('potree.js')) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } else {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
         }
 
         console.log('All dependencies loaded successfully');
@@ -89,6 +92,12 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           material.shape = window.Potree.PointShape.SQUARE;
           
           try {
+            if (!window.Potree.PointColorType) {
+              console.warn('PointColorType not available, defaulting to RGB');
+              material.pointColorType = 0; // RGB is typically 0
+              return;
+            }
+
             if (pointcloud.hasRGB) {
               material.pointColorType = window.Potree.PointColorType.RGB;
             } else if (pointcloud.intensity) {
@@ -97,8 +106,8 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
               material.pointColorType = window.Potree.PointColorType.HEIGHT;
             }
           } catch (error) {
-            console.warn('Error setting color type, falling back to HEIGHT:', error);
-            material.pointColorType = window.Potree.PointColorType.HEIGHT;
+            console.warn('Error setting color type:', error);
+            material.pointColorType = 0; // RGB
           }
 
           viewer.fitToScreen();
