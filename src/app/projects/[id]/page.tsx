@@ -209,9 +209,19 @@ export default function ProjectView() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900">
-      {/* LiDAR viewer container - now takes full height */}
-      <div className="fixed top-14 left-0 right-0 bottom-0">
-        {renderContent()}
+      {/* LiDAR viewer container with sidebar */}
+      <div className="fixed top-14 left-0 right-0 bottom-0 flex">
+        {/* Potree Sidebar Container - Add overflow handling */}
+        <div 
+          id="potree_sidebar_container" 
+          className="w-[300px] bg-black/80 border-r border-white/10 overflow-y-auto"
+          style={{ zIndex: 10 }} // Ensure sidebar stays on top
+        />
+        
+        {/* Main Content */}
+        <div className="flex-1">
+          {renderContent()}
+        </div>
       </div>
     </div>
   )

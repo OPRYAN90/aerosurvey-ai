@@ -86,6 +86,12 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           showStats: false
         });
 
+        // Initialize Potree's GUI
+        viewer.loadGUI(() => {
+          viewer.setLanguage('en');
+          viewer.toggleSidebar();
+        });
+
         viewerRef.current = viewer;
 
         window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
@@ -150,9 +156,20 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
       }
-      // Dispose of viewer
+      // Enhanced cleanup for viewer
       if (viewerRef.current) {
-        viewerRef.current.dispose();
+        try {
+          if (viewerRef.current.renderer) {
+            viewerRef.current.renderer.dispose();
+          }
+          if (viewerRef.current.scene) {
+            viewerRef.current.scene.pointclouds = [];
+          }
+          viewerRef.current.destroy();
+          viewerRef.current = null;
+        } catch (error) {
+          console.warn('Error during cleanup:', error);
+        }
       }
     };
   }, [isDependenciesLoaded, project.convertedUrl, project.id, project.name, onError]);
