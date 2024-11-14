@@ -31,7 +31,6 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           '/potree/libs/tween/tween.min.js',
           '/potree/libs/proj4/proj4.js',
           '/potree/libs/jquery-ui/jquery-ui.min.js',
-          '/potree/libs/other/stats.min.js',
           '/potree/libs/spectrum/spectrum.js',
           '/potree/build/potree/potree.js'
         ];
@@ -83,7 +82,8 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           fov: 60,
           edlEnabled: true,
           background: 'rgb(32, 32, 32)',
-          useEDL: true
+          useEDL: true,
+          showStats: false
         });
 
         viewerRef.current = viewer;
