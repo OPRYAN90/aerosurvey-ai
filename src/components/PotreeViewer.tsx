@@ -34,6 +34,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           '/potree/libs/jquery-ui/jquery-ui.min.js',
           '/potree/libs/spectrum/spectrum.js',
           '/potree/libs/i18next/i18next.js',
+          '/potree/libs/d3/d3.js',
           '/potree/libs/jstree/jstree.js',
           '/potree/build/potree/potree.js'
         ];
