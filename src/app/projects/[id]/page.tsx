@@ -14,6 +14,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
+import type { ViewerControls } from '@/types/viewer'
 
 // Import PotreeViewer with NoSSR
 const PotreeViewer = dynamic(
@@ -34,9 +35,6 @@ const PotreeViewer = dynamic(
 // Add this interface near the top of the file with other imports
 interface ViewerContainer extends HTMLDivElement {
   viewerControls?: {
-    zoomIn: () => void;
-    zoomOut: () => void;
-    reset: () => void;
     toggleFullscreen: () => void;
   }
 }
@@ -48,7 +46,7 @@ export default function ProjectView() {
     isLoading: true,
     error: null as string | null
   })
-  const containerRef = useRef<ViewerContainer>(null)
+  const viewerRef = useRef<ViewerControls>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -152,52 +150,20 @@ export default function ProjectView() {
     }
 
     return (
-      <div className="relative w-full h-full" ref={containerRef}>
+      <div className="relative w-full h-full">
         <PotreeViewer 
+          // ref={viewerRef}
           project={project}
           onError={handleViewerError}
         />
-        <div className="absolute top-4 right-4 flex gap-2">
+        <div className="absolute top-4 right-4" style={{ zIndex: 9999 }}>
           <Button
             variant="ghost"
             size="icon"
             className="bg-black/50 hover:bg-black/70 text-white"
             onClick={() => {
-              const controls = containerRef.current?.viewerControls
-              controls?.zoomIn()
-            }}
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="bg-black/50 hover:bg-black/70 text-white"
-            onClick={() => {
-              const controls = containerRef.current?.viewerControls
-              controls?.zoomOut()
-            }}
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="bg-black/50 hover:bg-black/70 text-white"
-            onClick={() => {
-              const controls = containerRef.current?.viewerControls
-              controls?.reset()
-            }}
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="bg-black/50 hover:bg-black/70 text-white"
-            onClick={() => {
-              const controls = containerRef.current?.viewerControls
-              controls?.toggleFullscreen()
+              console.log('Fullscreen button clicked');
+              viewerRef.current?.toggleFullscreen();
             }}
           >
             <Maximize className="h-4 w-4" />
