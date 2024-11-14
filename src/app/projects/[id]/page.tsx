@@ -209,29 +209,8 @@ export default function ProjectView() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900">
-      {/* Project header - compact version */}
-      {project && (
-        <div className="fixed top-14 left-0 right-0 bg-black/50 backdrop-blur-sm z-10">
-          <div className="p-4 flex justify-between items-center max-w-7xl mx-auto">
-            <div>
-              <h1 className="text-xl font-bold text-white">{project.name}</h1>
-              <p className="text-sm text-white/70">
-                Material: {project.material === 'custom' ? project.customMaterial : project.material}
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              className="text-white border-white/10 hover:bg-white/10"
-              onClick={() => window.history.back()}
-            >
-              Back to Projects
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* LiDAR viewer container - takes full remaining height */}
-      <div className="fixed top-[104px] left-0 right-0 bottom-0">
+      {/* LiDAR viewer container - now takes full height */}
+      <div className="fixed top-14 left-0 right-0 bottom-0">
         {renderContent()}
       </div>
     </div>
