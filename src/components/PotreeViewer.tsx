@@ -21,6 +21,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         await loadStyles([
           '/potree/libs/jquery-ui/jquery-ui.min.css',
           '/potree/libs/spectrum/spectrum.css',
+          '/potree/libs/jstree/themes/mixed/style.css',
           '/potree/build/potree/potree.css'
         ]);
 
@@ -32,6 +33,8 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           '/potree/libs/proj4/proj4.js',
           '/potree/libs/jquery-ui/jquery-ui.min.js',
           '/potree/libs/spectrum/spectrum.js',
+          '/potree/libs/i18next/i18next.js',
+          '/potree/libs/jstree/jstree.js',
           '/potree/build/potree/potree.js'
         ];
 
