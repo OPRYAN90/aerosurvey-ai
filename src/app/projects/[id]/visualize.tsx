@@ -163,20 +163,24 @@ export default function VisualizePage() {
   }
 
   return (
-    <main className="mt-16 min-h-[calc(100vh-4rem)] bg-gradient-to-br from-black via-gray-900 to-blue-900">
+    <main className="h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900">
+      {/* Fixed spacing for navbar */}
+      <div className="h-14" />
+      
       {/* Project header */}
-      <div className="h-16 border-b border-white/10 bg-black/20">
+      <div className="h-14 border-b border-white/10 bg-black/20">
         <div className="h-full px-6 flex items-center">
           <h1 className="text-2xl font-bold text-white">{project.name}</h1>
         </div>
       </div>
 
       {/* Main content wrapper */}
-      <div className="flex h-[calc(100vh-8rem)]">
+      <div className="flex h-[calc(100vh-7rem)]">
         {/* Potree Sidebar */}
         <div 
           id="potree_sidebar_container" 
-          className="w-[300px] bg-black/80 border-r border-white/10 overflow-y-auto"
+          className="w-[300px] bg-black border-r border-white/10 overflow-y-auto"
+          style={{ isolation: 'isolate' }}
         />
         
         {/* Viewer Container */}

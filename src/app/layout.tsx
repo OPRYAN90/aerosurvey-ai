@@ -3,6 +3,7 @@ import { Navbar } from '@/components/ui/navbar'
 import localFont from "next/font/local";
 import type { Metadata } from "next";
 import { AuthProvider } from '@/contexts/auth-context'
+import '@/styles/potree-overrides.css'
 
 // Metadata definition
 export const metadata: Metadata = {

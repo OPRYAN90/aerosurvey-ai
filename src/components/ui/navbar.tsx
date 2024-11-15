@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { LogOut, LayoutDashboard, FolderOpen } from 'lucide-react'
+import { useEffect } from 'react'
 
 export function Navbar() {
   const pathname = usePathname()
@@ -14,24 +15,37 @@ export function Navbar() {
   const isAuthedRoute = pathname === '/dashboard' || pathname === '/projects'
   const isProjectViewPage = pathname.startsWith('/projects/') && pathname !== '/projects'
 
+  useEffect(() => {
+    if (isProjectViewPage) {
+      const checkButtonStyles = () => {
+        const buttons = document.querySelectorAll('.navbar-button');
+        buttons.forEach(button => {
+          const styles = window.getComputedStyle(button);
+          console.log('Button text color:', styles.color);
+        });
+      };
+
+      checkButtonStyles();
+      setTimeout(checkButtonStyles, 1000);
+    }
+  }, [isProjectViewPage]);
+
   if (isAuthPage) {
     return null
   }
 
   return (
-    <div className={`
+    <nav className={`
+      fixed top-0 left-0 right-0 h-14 
       ${isProjectViewPage 
-        ? "fixed top-0 left-0 right-0 h-16 border-b border-white/10 bg-black/20 backdrop-blur-sm" 
-        : "absolute top-0 left-0 right-0"
+        ? "bg-black border-b border-white/10 backdrop-blur-sm"
+        : "absolute bg-transparent"
       } 
-      z-50 ${!isProjectViewPage && "p-4"}
+      z-[9999] isolate
     `}>
-      <div className={`
-        ${isProjectViewPage ? "h-full px-4" : ""} 
-        max-w-7xl mx-auto flex justify-between items-center
-      `}>
-        <Link href="/" className="flex items-center">
-          <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-500">
+      <div className="h-full max-w-7xl mx-auto flex justify-between items-center px-4">
+        <Link href="/" className="flex items-center text-2xl">
+          <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-500">
             AeroSurvey AI
           </span>
         </Link>
@@ -41,7 +55,7 @@ export function Navbar() {
             <nav className="flex items-center gap-2 mr-4">
               <Button
                 variant="ghost"
-                className="text-white hover:text-blue-400 transition-colors flex items-center gap-2"
+                className="navbar-button !text-white hover:!text-blue-400 transition-colors flex items-center gap-2 [&>a]:!text-white [&>a]:hover:!text-blue-400"
                 asChild
               >
                 <Link href="/dashboard">
@@ -87,6 +101,6 @@ export function Navbar() {
           </div>
         )}
       </div>
-    </div>
+    </nav>
   )
 }

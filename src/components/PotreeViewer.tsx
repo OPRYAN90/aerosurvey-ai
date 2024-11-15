@@ -216,7 +216,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   };
 
   return (
-    <div className="relative w-full h-full min-h-[600px]">
+    <div className="potree-scope">
       <div 
         ref={containerRef} 
         className="w-full h-full"
