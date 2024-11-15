@@ -184,7 +184,7 @@ export default function VisualizePage() {
         />
         
         {/* Viewer Container */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative h-full">
           {(conversionStatus === 'converting' || conversionStatus === 'pending') && (
             <ConversionProgress 
               progress={conversionProgress} 
@@ -193,10 +193,12 @@ export default function VisualizePage() {
           )}
           
           {project.convertedUrl ? (
-            <PotreeViewer 
-              project={project}
-              onError={setError}
-            />
+            <div className="absolute inset-0">
+              <PotreeViewer 
+                project={project}
+                onError={setError}
+              />
+            </div>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-white/70">

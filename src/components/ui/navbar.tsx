@@ -65,7 +65,7 @@ export function Navbar() {
               </Button>
               <Button
                 variant="ghost"
-                className="text-white hover:text-blue-400 transition-colors flex items-center gap-2"
+                className="navbar-button !text-white hover:!text-blue-400 transition-colors flex items-center gap-2 [&>a]:!text-white [&>a]:hover:!text-blue-400"
                 asChild
               >
                 <Link href="/projects">

@@ -216,10 +216,10 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   };
 
   return (
-    <div className="potree-scope">
+    <div className="potree-scope relative w-full h-full">
       <div 
         ref={containerRef} 
-        className="w-full h-full"
+        className="absolute inset-0"
         style={{ visibility: isLoading ? 'hidden' : 'visible' }}
       />
       
