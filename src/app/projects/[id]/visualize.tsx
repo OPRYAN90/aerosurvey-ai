@@ -139,7 +139,7 @@ export default function VisualizePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900">
+      <div className="mt-16 h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-blue-900">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"/>
           <p className="text-white">Loading project...</p>
@@ -150,7 +150,7 @@ export default function VisualizePage() {
 
   if (error || !project) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900">
+      <div className="mt-16 h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-blue-900">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
             <span className="text-red-500 text-2xl">!</span>
@@ -163,10 +163,24 @@ export default function VisualizePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-14">
-      <div className="p-5">
-        <h1 className="text-2xl font-bold text-white mb-4">{project.name}</h1>
-        <div className="relative bg-black/40 rounded-lg overflow-hidden h-[calc(100vh-12rem)]">
+    <main className="mt-16 min-h-[calc(100vh-4rem)] bg-gradient-to-br from-black via-gray-900 to-blue-900">
+      {/* Project header */}
+      <div className="h-16 border-b border-white/10 bg-black/20">
+        <div className="h-full px-6 flex items-center">
+          <h1 className="text-2xl font-bold text-white">{project.name}</h1>
+        </div>
+      </div>
+
+      {/* Main content wrapper */}
+      <div className="flex h-[calc(100vh-8rem)]">
+        {/* Potree Sidebar */}
+        <div 
+          id="potree_sidebar_container" 
+          className="w-[300px] bg-black/80 border-r border-white/10 overflow-y-auto"
+        />
+        
+        {/* Viewer Container */}
+        <div className="flex-1 relative">
           {(conversionStatus === 'converting' || conversionStatus === 'pending') && (
             <ConversionProgress 
               progress={conversionProgress} 
@@ -190,6 +204,6 @@ export default function VisualizePage() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

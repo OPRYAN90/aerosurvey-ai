@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -12,22 +12,31 @@ export function Navbar() {
   
   const isAuthPage = pathname === '/signin' || pathname === '/login' || pathname === '/signup'
   const isAuthedRoute = pathname === '/dashboard' || pathname === '/projects'
+  const isProjectViewPage = pathname.startsWith('/projects/') && pathname !== '/projects'
 
   if (isAuthPage) {
-    return null // Don't show navbar on auth pages
+    return null
   }
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-50 p-4">
-      <div className="max-w-7xl mx-auto flex justify-between items-center">
+    <div className={`
+      ${isProjectViewPage 
+        ? "fixed top-0 left-0 right-0 h-16 border-b border-white/10 bg-black/20 backdrop-blur-sm" 
+        : "absolute top-0 left-0 right-0"
+      } 
+      z-50 ${!isProjectViewPage && "p-4"}
+    `}>
+      <div className={`
+        ${isProjectViewPage ? "h-full px-4" : ""} 
+        max-w-7xl mx-auto flex justify-between items-center
+      `}>
         <Link href="/" className="flex items-center">
           <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-500">
             AeroSurvey AI
           </span>
         </Link>
         
-        {isAuthedRoute ? (
-          // Navigation for authenticated routes
+        {isAuthedRoute || isProjectViewPage ? (
           <div className="flex items-center gap-4">
             <nav className="flex items-center gap-2 mr-4">
               <Button
@@ -61,7 +70,6 @@ export function Navbar() {
             </Button>
           </div>
         ) : (
-          // Navigation for public routes
           <div className="flex gap-4">
             <Button
               variant="ghost"
