@@ -793,3 +793,94 @@ body{
 	padding-top: 0.6em;
 	padding-bottom: 0.1em;
 }
+
+/* Toolbar Layout */
+#tools {
+    padding: 8px;
+}
+
+/* Tool Groups */
+.potree-tool-group {
+    margin-bottom: 12px;
+    background: var(--bg-light-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.potree-tool-group-title {
+    color: var(--font-color-2);
+    font-size: 0.9em;
+    padding: 4px 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+    font-weight: bold;
+}
+
+.potree-tool-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 4px;
+}
+
+/* Tool Icons */
+.button-icon {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 4px !important;
+    margin: 2px !important;
+    background: var(--bg-dark-color);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.button-icon:hover {
+    background: var(--bg-hover-color);
+    transform: scale(1.05);
+    filter: brightness(1.2);
+}
+
+.button-icon img {
+    width: 24px;
+    height: 24px;
+    opacity: 0.8;
+}
+
+.button-icon:hover img {
+    opacity: 1;
+}
+
+/* Show/Hide Labels Section */
+#measurement_options_show {
+    margin-top: 8px;
+    padding: 0 8px;
+}
+
+/* Divider Styling */
+.divider {
+    margin: 12px 0;
+    padding: 0 8px;
+    text-align: center;
+    position: relative;
+}
+
+.divider::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.divider span {
+    background: var(--bg-light-color);
+    padding: 0 8px;
+    position: relative;
+    color: var(--font-color-2);
+    font-size: 0.9em;
+}
