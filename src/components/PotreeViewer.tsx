@@ -90,38 +90,22 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     const initViewer = async () => {
       try {
         const container = containerRef.current;
-        if (!container) return;
-        
         container.innerHTML = '';
         
-        // Create viewer wrapper
-        const viewerWrapper = document.createElement('div');
-        viewerWrapper.className = 'potree-viewer-wrapper';
-        viewerWrapper.style.cssText = `
-          position: relative;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          display: flex;
-        `;
-        container.appendChild(viewerWrapper);
-
-        // Create render area
+        // Create root container with original Potree styling
         const renderArea = document.createElement('div');
         renderArea.id = 'potree_render_area';
         renderArea.style.cssText = `
           position: absolute;
-          width: 100%;
-          height: 100%;
-          left: 300px;
           top: 0;
-          right: 0;
           bottom: 0;
-          transition: left 0.35s;
+          right: 0;
+          left: 300px;
+          overflow: hidden;
+          transition: left 0.35s ease;
         `;
-        viewerWrapper.appendChild(renderArea);
+        container.appendChild(renderArea);
 
-        // Initialize viewer
         const viewer = new window.Potree.Viewer(renderArea, {
           useDefaultRenderLoop: true,
           pointBudget: 1_000_000,
@@ -132,10 +116,24 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           showStats: false
         });
 
-        viewerRef.current = viewer;
+        // Modify toggleSidebar to use correct transitions
+        viewer.toggleSidebar = () => {
+          const renderArea = document.getElementById('potree_render_area');
+          const sidebar = document.getElementById('potree_sidebar_container');
+          
+          if (renderArea && sidebar) {
+            const isVisible = renderArea.style.left !== '0px';
+            
+            renderArea.style.left = isVisible ? '0px' : '300px';
+            sidebar.style.transform = isVisible ? 
+              'translateX(-300px)' : 'translateX(0)';
+            sidebar.style.transition = 'transform 0.35s ease';
+          }
+        };
 
-        // Setup GUI with proper sidebar handling
         viewer.loadGUI(() => {
+          viewer.setLanguage('en');
+          
           const sidebar = document.getElementById('potree_sidebar_container');
           if (sidebar) {
             sidebar.style.cssText = `
@@ -144,34 +142,24 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
               top: 0;
               bottom: 0;
               width: 300px;
-              overflow-y: auto;
               background-color: rgba(0, 0, 0, 0.8);
-              border-right: 1px solid rgba(255, 255, 255, 0.1);
               z-index: 10;
+              overflow-y: auto;
+              transition: transform 0.35s ease;
             `;
-            viewerWrapper.insertBefore(sidebar, renderArea);
           }
-
-          // Update toggle functionality
-          viewer.toggleSidebar = () => {
-            const renderArea = document.getElementById('potree_render_area');
-            if (renderArea) {
-              const isHidden = renderArea.style.left === '0px';
-              renderArea.style.left = isHidden ? '300px' : '0px';
-            }
-          };
         });
+
+        viewerRef.current = viewer;
 
         const publicUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
         
         window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
-          if (!e || !e.pointcloud) {
+          if (!e?.pointcloud) {
             throw new Error('Invalid point cloud data received');
           }
 
-          const pointcloud = e.pointcloud;
-          viewer.scene.addPointCloud(pointcloud);
-
+          viewer.scene.addPointCloud(e.pointcloud);
           setTimeout(() => {
             viewer.fitToScreen();
             setIsLoading(false);
@@ -181,6 +169,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
       } catch (error) {
         console.error('Viewer initialization error:', error);
         onError?.(error instanceof Error ? error.message : 'Failed to initialize viewer');
+        setIsLoading(false);
       }
     };
 
