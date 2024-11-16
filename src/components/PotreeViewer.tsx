@@ -148,6 +148,23 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
               transition: transform 0.35s ease;
             `;
           }
+
+          // Add menu toggle styling
+          const menuToggle = document.querySelector('.potree_menu_toggle');
+          if (menuToggle) {
+            const imgElement = menuToggle.querySelector('img');
+            if (imgElement) {
+              imgElement.style.cssText = `
+                width: 24px;
+                height: 24px;
+                padding: 4px;
+                margin: 4px;
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 4px;
+                cursor: pointer;
+              `;
+            }
+          }
         });
 
         viewerRef.current = viewer;
@@ -186,6 +203,18 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
       }
     };
   }, [isDependenciesLoaded, project.convertedUrl, project.id, project.name, onError]);
+
+  useEffect(() => {
+    // Load custom styles
+    const customStyles = document.createElement('link');
+    customStyles.rel = 'stylesheet';
+    customStyles.href = '/potree-customizations.css';
+    document.head.appendChild(customStyles);
+
+    return () => {
+      document.head.removeChild(customStyles);
+    };
+  }, []);
 
   const loadStyles = async (urls: string[]) => {
     const promises = urls.map(url => {

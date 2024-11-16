@@ -1,0 +1,41 @@
+/* Base sidebar container */
+#potree_sidebar_container {
+  background: rgba(0, 0, 0, 0.8) !important;
+  width: 300px !important;
+}
+
+/* Panel headers */
+.accordion > h3 {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: none !important;
+  color: #ffffff !important;
+}
+
+/* Tools section */
+.tools-section {
+  padding: 8px !important;
+}
+
+/* Measurement tools */
+.measurement-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(24px, 1fr));
+  gap: 4px;
+  padding: 8px;
+}
+
+/* Toggle button */
+.potree_menu_toggle {
+  position: absolute !important;
+  top: 8px !important;
+  left: 8px !important;
+  z-index: 100 !important;
+}
+
+.potree_menu_toggle img {
+  width: 24px !important;
+  height: 24px !important;
+  padding: 4px !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-radius: 4px !important;
+} 
