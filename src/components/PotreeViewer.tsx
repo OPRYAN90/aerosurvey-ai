@@ -14,6 +14,28 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   const loadingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
+    const debugDOM = () => {
+      console.log('Current DOM structure:', {
+        container: containerRef.current,
+        renderArea: document.getElementById('potree_render_area'),
+        sidebar: document.getElementById('potree_sidebar_container'),
+        map: document.getElementById('potree_map')
+      });
+
+      if (viewerRef.current) {
+        console.log('Viewer state:', {
+          viewer: viewerRef.current,
+          scene: viewerRef.current.scene,
+          gui: viewerRef.current.gui
+        });
+      }
+    };
+
+    const debugInterval = setInterval(debugDOM, 2000);
+    return () => clearInterval(debugInterval);
+  }, []);
+
+  useEffect(() => {
     const loadDependencies = async () => {
       try {
         console.log('Starting to load dependencies...');
@@ -67,20 +89,40 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
     const initViewer = async () => {
       try {
-        const publicUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
-        console.log('Initializing viewer with URL:', publicUrl);
+        const container = containerRef.current;
+        if (!container) return;
         
-        if (!window.Potree) {
-          throw new Error('Potree not initialized');
-        }
+        container.innerHTML = '';
+        
+        // Create viewer wrapper
+        const viewerWrapper = document.createElement('div');
+        viewerWrapper.className = 'potree-viewer-wrapper';
+        viewerWrapper.style.cssText = `
+          position: relative;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          display: flex;
+        `;
+        container.appendChild(viewerWrapper);
 
-        // Set a timeout for loading
-        loadingTimeoutRef.current = setTimeout(() => {
-          onError?.('Loading timeout - viewer took too long to initialize');
-          setIsLoading(false);
-        }, 30000); // 30 second timeout
+        // Create render area
+        const renderArea = document.createElement('div');
+        renderArea.id = 'potree_render_area';
+        renderArea.style.cssText = `
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          left: 300px;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          transition: left 0.35s;
+        `;
+        viewerWrapper.appendChild(renderArea);
 
-        const viewer = new window.Potree.Viewer(containerRef.current, {
+        // Initialize viewer
+        const viewer = new window.Potree.Viewer(renderArea, {
           useDefaultRenderLoop: true,
           pointBudget: 1_000_000,
           fov: 60,
@@ -90,85 +132,63 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           showStats: false
         });
 
-        // Initialize Potree's GUI
-        viewer.loadGUI(() => {
-          viewer.setLanguage('en');
-          viewer.toggleSidebar();
-        });
-
         viewerRef.current = viewer;
 
-        window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
-          // Clear timeout since point cloud loaded
-          if (loadingTimeoutRef.current) {
-            clearTimeout(loadingTimeoutRef.current);
+        // Setup GUI with proper sidebar handling
+        viewer.loadGUI(() => {
+          const sidebar = document.getElementById('potree_sidebar_container');
+          if (sidebar) {
+            sidebar.style.cssText = `
+              position: absolute;
+              left: 0;
+              top: 0;
+              bottom: 0;
+              width: 300px;
+              overflow-y: auto;
+              background-color: rgba(0, 0, 0, 0.8);
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              z-index: 10;
+            `;
+            viewerWrapper.insertBefore(sidebar, renderArea);
           }
 
+          // Update toggle functionality
+          viewer.toggleSidebar = () => {
+            const renderArea = document.getElementById('potree_render_area');
+            if (renderArea) {
+              const isHidden = renderArea.style.left === '0px';
+              renderArea.style.left = isHidden ? '300px' : '0px';
+            }
+          };
+        });
+
+        const publicUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
+        
+        window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
           if (!e || !e.pointcloud) {
             throw new Error('Invalid point cloud data received');
           }
 
-          console.log('Point cloud loaded:', e);
           const pointcloud = e.pointcloud;
-          
-          try {
-            viewer.scene.addPointCloud(pointcloud);
+          viewer.scene.addPointCloud(pointcloud);
 
-            const material = pointcloud.material;
-            material.size = 1;
-            material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
-            material.shape = window.Potree.PointShape.SQUARE;
-            
-            // Simplified color type setting
-            if (pointcloud.hasRGB) {
-              material.pointColorType = 0; // RGB
-              console.log('Using RGB coloring');
-            } else if (pointcloud.intensity) {
-              material.pointColorType = 1; // Intensity
-              console.log('Using intensity coloring');
-            } else {
-              material.pointColorType = 2; // Height
-              console.log('Using height coloring');
-            }
-
-            // Force a render update
-            viewer.scene.dispatchEvent({ type: 'point_cloud_loaded' });
-            
-            // Small delay before fitToScreen to ensure proper initialization
-            setTimeout(() => {
-              viewer.fitToScreen();
-              setIsLoading(false);
-            }, 100);
-
-          } catch (error) {
-            console.error('Error configuring point cloud:', error);
-            onError?.(error instanceof Error ? error.message : 'Failed to configure point cloud');
+          setTimeout(() => {
+            viewer.fitToScreen();
             setIsLoading(false);
-          }
+          }, 100);
         });
+
       } catch (error) {
-        console.error('Error initializing viewer:', error);
+        console.error('Viewer initialization error:', error);
         onError?.(error instanceof Error ? error.message : 'Failed to initialize viewer');
-        setIsLoading(false);
       }
     };
 
     initViewer();
 
     return () => {
-      // Clear any pending timeouts
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
-      // Enhanced cleanup for viewer
       if (viewerRef.current) {
         try {
-          if (viewerRef.current.renderer) {
-            viewerRef.current.renderer.dispose();
-          }
-          if (viewerRef.current.scene) {
-            viewerRef.current.scene.pointclouds = [];
-          }
           viewerRef.current.destroy();
           viewerRef.current = null;
         } catch (error) {
@@ -216,11 +236,15 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   };
 
   return (
-    <div className="potree-scope relative w-full h-full">
+    <div className="w-full h-full relative">
       <div 
         ref={containerRef} 
-        className="absolute inset-0"
-        style={{ visibility: isLoading ? 'hidden' : 'visible' }}
+        style={{ 
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+          visibility: isLoading ? 'hidden' : 'visible'
+        }}
       />
       
       {isLoading && (
@@ -235,4 +259,4 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
       )}
     </div>
   );
-} 
+}

@@ -83,7 +83,6 @@ export default function VisualizePage() {
         if (projectData.fileUrl && !projectData.convertedUrl && projectData.conversionStatus !== 'converting') {
           setConversionStatus('pending');
           try {
-            // @ts-ignore
             await ConversionService.startConversion(projectData, (progress) => {
               setConversionProgress(progress);
             });
@@ -104,42 +103,9 @@ export default function VisualizePage() {
     loadProject();
   }, [params.id]);
 
-  useEffect(() => {
-    const testFiles = async () => {
-      if (project?.convertedUrl) {
-        try {
-          // Test metadata.json
-          const metadataResponse = await fetch(project.convertedUrl);
-          console.log('Metadata file access:', {
-            status: metadataResponse.status,
-            type: metadataResponse.headers.get('content-type'),
-            data: await metadataResponse.json()
-          });
-
-          // Try to access hierarchy and octree
-          const baseUrl = project.convertedUrl.replace('metadata.json', '');
-          const files = ['hierarchy.bin', 'octree.bin'];
-          
-          for (const file of files) {
-            const response = await fetch(`${baseUrl}${file}`);
-            console.log(`${file} access:`, {
-              status: response.status,
-              type: response.headers.get('content-type'),
-              size: response.headers.get('content-length')
-            });
-          }
-        } catch (error) {
-          console.error('File access test failed:', error);
-        }
-      }
-    };
-
-    testFiles();
-  }, [project?.convertedUrl]);
-
   if (isLoading) {
     return (
-      <div className="mt-16 h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-blue-900">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-blue-900">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"/>
           <p className="text-white">Loading project...</p>
@@ -150,7 +116,7 @@ export default function VisualizePage() {
 
   if (error || !project) {
     return (
-      <div className="mt-16 h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-blue-900">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-blue-900">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
             <span className="text-red-500 text-2xl">!</span>
@@ -164,9 +130,6 @@ export default function VisualizePage() {
 
   return (
     <main className="h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900">
-      {/* Fixed spacing for navbar */}
-      <div className="h-14" />
-      
       {/* Project header */}
       <div className="h-14 border-b border-white/10 bg-black/20">
         <div className="h-full px-6 flex items-center">
@@ -174,41 +137,21 @@ export default function VisualizePage() {
         </div>
       </div>
 
-      {/* Main content wrapper */}
-      <div className="flex h-[calc(100vh-7rem)]">
-        {/* Potree Sidebar */}
-        <div 
-          id="potree_sidebar_container" 
-          className="w-[300px] bg-black border-r border-white/10 overflow-y-auto"
-          style={{ isolation: 'isolate' }}
-        />
+      {/* Viewer Container - Let Potree control the layout */}
+      <div className="h-[calc(100vh-3.5rem)] relative">
+        {(conversionStatus === 'converting' || conversionStatus === 'pending') && (
+          <ConversionProgress 
+            progress={conversionProgress} 
+            status={conversionStatus}
+          />
+        )}
         
-        {/* Viewer Container */}
-        <div className="flex-1 relative h-full">
-          {(conversionStatus === 'converting' || conversionStatus === 'pending') && (
-            <ConversionProgress 
-              progress={conversionProgress} 
-              status={conversionStatus}
-            />
-          )}
-          
-          {project.convertedUrl ? (
-            <div className="absolute inset-0">
-              <PotreeViewer 
-                project={project}
-                onError={setError}
-              />
-            </div>
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-white/70">
-                {conversionStatus === 'error' 
-                  ? 'Failed to convert project'
-                  : 'Converting project...'}
-              </p>
-            </div>
-          )}
-        </div>
+        {project.convertedUrl && (
+          <PotreeViewer 
+            project={project}
+            onError={setError}
+          />
+        )}
       </div>
     </main>
   );
