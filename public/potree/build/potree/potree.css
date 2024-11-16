@@ -795,7 +795,7 @@ body{
 }
 
 /* Toolbar Layout */
-#tools {
+#tools, #clipping_tools {
     padding: 8px;
 }
 
@@ -853,10 +853,36 @@ body{
     opacity: 1;
 }
 
-/* Show/Hide Labels Section */
-#measurement_options_show {
+/* Options Groups */
+.options-group {
     margin-top: 8px;
-    padding: 0 8px;
+    padding: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Clip Task & Method Options */
+#cliptask_options, #clipmethod_options {
+    margin-top: 8px;
+}
+
+#cliptask_options .ui-selectgroup-item,
+#clipmethod_options .ui-selectgroup-item {
+    background: var(--bg-dark-color);
+    border: 1px solid var(--border-color);
+    color: var(--font-color);
+    padding: 4px 8px;
+    border-radius: 2px;
+}
+
+#cliptask_options .ui-selectgroup-item:hover,
+#clipmethod_options .ui-selectgroup-item:hover {
+    background: var(--bg-hover-color);
+}
+
+#cliptask_options .ui-selectgroup-item.selected,
+#clipmethod_options .ui-selectgroup-item.selected {
+    background: var(--color-3);
+    color: white;
 }
 
 /* Divider Styling */
@@ -865,6 +891,7 @@ body{
     padding: 0 8px;
     text-align: center;
     position: relative;
+    color: var(--font-color-2);
 }
 
 .divider::before {
@@ -881,6 +908,41 @@ body{
     background: var(--bg-light-color);
     padding: 0 8px;
     position: relative;
-    color: var(--font-color-2);
     font-size: 0.9em;
+}
+
+/* Radio Button Groups */
+.button-group {
+    display: flex;
+    gap: 4px;
+}
+
+.button-group button {
+    flex: 1;
+    padding: 4px 8px;
+    background: var(--bg-dark-color);
+    border: 1px solid var(--border-color);
+    color: var(--font-color);
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.button-group button:hover {
+    background: var(--bg-hover-color);
+}
+
+.button-group button.active {
+    background: var(--color-3);
+    color: white;
+}
+
+/* Section Headers */
+.section-header {
+    color: var(--font-color-2);
+    font-size: 1.1em;
+    font-weight: bold;
+    padding: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: center;
 }

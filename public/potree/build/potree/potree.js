@@ -80006,76 +80006,41 @@ ENDSEC
 		}
 	
 		initClippingTool(){
-	
-	
-			this.viewer.addEventListener("cliptask_changed", (event) => {
-				console.log("TODO");
-			});
-	
-			this.viewer.addEventListener("clipmethod_changed", (event) => {
-				console.log("TODO");
-			});
-	
-			{
-				let elClipTask = $("#cliptask_options");
-				elClipTask.selectgroup({title: "Clip Task"});
-	
-				elClipTask.find("input").click( (e) => {
-					this.viewer.setClipTask(ClipTask[e.target.value]);
-				});
-	
-				let currentClipTask = Object.keys(ClipTask)
-					.filter(key => ClipTask[key] === this.viewer.clipTask);
-				elClipTask.find(`input[value=${currentClipTask}]`).trigger("click");
-			}
-	
-			{
-				let elClipMethod = $("#clipmethod_options");
-				elClipMethod.selectgroup({title: "Clip Method"});
-	
-				elClipMethod.find("input").click( (e) => {
-					this.viewer.setClipMethod(ClipMethod[e.target.value]);
-				});
-	
-				let currentClipMethod = Object.keys(ClipMethod)
-					.filter(key => ClipMethod[key] === this.viewer.clipMethod);
-				elClipMethod.find(`input[value=${currentClipMethod}]`).trigger("click");
-			}
-	
-			let clippingToolBar = $("#clipping_tools");
-	
+			let elClippingTools = $("#clipping_tools");
+			
+			// Create clipping tools group
+			let clippingGroup = $(`
+				<div class="potree-tool-group">
+					<div class="potree-tool-group-title">Clipping Tools</div>
+					<div class="potree-tool-grid"></div>
+				</div>
+			`);
+			let clippingGrid = clippingGroup.find('.potree-tool-grid');
+		
 			// CLIP VOLUME
-			clippingToolBar.append(this.createToolIcon(
+			clippingGrid.append(this.createToolIcon(
 				Potree.resourcePath + '/icons/clip_volume.svg',
 				'[title]tt.clip_volume',
 				() => {
 					let item = this.volumeTool.startInsertion({clip: true}); 
-	
-					let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-					let jsonNode = measurementsRoot.children.find(child => child.data.uuid === item.uuid);
-					$.jstree.reference(jsonNode.id).deselect_all();
-					$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+					this.selectMeasurement(item);
 				}
 			));
-	
+		
 			// CLIP POLYGON
-			clippingToolBar.append(this.createToolIcon(
+			clippingGrid.append(this.createToolIcon(
 				Potree.resourcePath + "/icons/clip-polygon.svg",
 				"[title]tt.clip_polygon",
 				() => {
 					let item = this.viewer.clippingTool.startInsertion({type: "polygon"});
-	
-					let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-					let jsonNode = measurementsRoot.children.find(child => child.data.uuid === item.uuid);
-					$.jstree.reference(jsonNode.id).deselect_all();
-					$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+					this.selectMeasurement(item);
 				}
 			));
-	
-			{// SCREEN BOX SELECT
+		
+			// SCREEN BOX SELECT
+			{
 				let boxSelectTool = new ScreenBoxSelectTool(this.viewer);
-	
-				clippingToolBar.append(this.createToolIcon(
+				clippingGrid.append(this.createToolIcon(
 					Potree.resourcePath + "/icons/clip-screen.svg",
 					"[title]tt.screen_clip_box",
 					() => {
@@ -80084,28 +80049,76 @@ ENDSEC
 								{duration: 2000});
 							return;
 						}
-						
 						let item = boxSelectTool.startInsertion();
-	
-						let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-						let jsonNode = measurementsRoot.children.find(child => child.data.uuid === item.uuid);
-						$.jstree.reference(jsonNode.id).deselect_all();
-						$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+						this.selectMeasurement(item);
 					}
 				));
 			}
-	
-			{ // REMOVE CLIPPING TOOLS
-				clippingToolBar.append(this.createToolIcon(
-					Potree.resourcePath + "/icons/remove.svg",
-					"[title]tt.remove_all_clipping_volumes",
-					() => {
-	
-						this.viewer.scene.removeAllClipVolumes();
-					}
-				));
+		
+			// REMOVE ALL
+			clippingGrid.append(this.createToolIcon(
+				Potree.resourcePath + "/icons/remove.svg",
+				"[title]tt.remove_all_clipping_volumes",
+				() => {
+					this.viewer.scene.removeAllClipVolumes();
+				}
+			));
+		
+			// Add the clipping group to toolbar
+			elClippingTools.append(clippingGroup);
+		
+			// Create options group
+			let optionsGroup = $(`
+				<div class="potree-tool-group">
+					<div class="potree-tool-group-title">Clipping Options</div>
+				</div>
+			`);
+		
+			// Add clip task options
+			{
+				let elClipTask = $(`<div id="cliptask_options"></div>`);
+				optionsGroup.append(elClipTask);
+				elClipTask.selectgroup({title: "Clip Task"});
+		
+				elClipTask.find("input").click((e) => {
+					this.viewer.setClipTask(ClipTask[e.target.value]);
+				});
+		
+				let currentClipTask = Object.keys(ClipTask)
+					.filter(key => ClipTask[key] === this.viewer.clipTask);
+				elClipTask.find(`input[value=${currentClipTask}]`).trigger("click");
 			}
-	
+		
+			// Add clip method options
+			{
+				let elClipMethod = $(`<div id="clipmethod_options"></div>`);
+				optionsGroup.append(elClipMethod);
+				elClipMethod.selectgroup({title: "Clip Method"});
+		
+				elClipMethod.find("input").click((e) => {
+					this.viewer.setClipMethod(ClipMethod[e.target.value]);
+				});
+		
+				let currentClipMethod = Object.keys(ClipMethod)
+					.filter(key => ClipMethod[key] === this.viewer.clipMethod);
+				elClipMethod.find(`input[value=${currentClipMethod}]`).trigger("click");
+			}
+		
+			// Add the options group to toolbar
+			elClippingTools.append(optionsGroup);
+		
+			// Event listeners
+			this.viewer.addEventListener("cliptask_changed", (event) => {
+				let currentClipTask = Object.keys(ClipTask)
+					.filter(key => ClipTask[key] === this.viewer.clipTask);
+				$("#cliptask_options").find(`input[value=${currentClipTask}]`).prop("checked", true);
+			});
+		
+			this.viewer.addEventListener("clipmethod_changed", (event) => {
+				let currentClipMethod = Object.keys(ClipMethod)
+					.filter(key => ClipMethod[key] === this.viewer.clipMethod);
+				$("#clipmethod_options").find(`input[value=${currentClipMethod}]`).prop("checked", true);
+			});
 		}
 	
 		initFilters(){
