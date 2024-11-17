@@ -751,3 +751,32 @@ body{
 .potree_menu_toggle:hover .menu-line {
     background-color: #ffffff;
 }
+/* Export section styling */
+.export-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+}
+
+.export-label {
+    color: var(--font-color);
+    white-space: nowrap;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.export-buttons .button-icon {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 4px !important;
+    margin: 0 !important;
+    background: transparent;
+}
+
+#scene_export {
+    margin: 4px 0;
+}

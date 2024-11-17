@@ -79497,34 +79497,35 @@ ENDSEC
 		}
 
 		initScene(){
-
 			let elScene = $("#menu_scene");
 			let elObjects = elScene.next().find("#scene_objects");
 			let elProperties = elScene.next().find("#scene_object_properties");
-			
-
+		
 			{
 				let elExport = elScene.next().find("#scene_export");
-
+		
 				let geoJSONIcon = `${Potree.resourcePath}/icons/file_geojson.svg`;
 				let dxfIcon = `${Potree.resourcePath}/icons/file_dxf.svg`;
 				let potreeIcon = `${Potree.resourcePath}/icons/file_potree.svg`;
-
+		
 				elExport.append(`
-				Export: <br>
-				<a href="#" download="measure.json"><img name="geojson_export_button" src="${geoJSONIcon}" class="button-icon" style="height: 24px" /></a>
-				<a href="#" download="measure.dxf"><img name="dxf_export_button" src="${dxfIcon}" class="button-icon" style="height: 24px" /></a>
-				<a href="#" download="potree.json5"><img name="potree_export_button" src="${potreeIcon}" class="button-icon" style="height: 24px" /></a>
-			`);
-
+					<div class="export-container">
+						<span class="export-label">Export:</span>
+						<div class="export-buttons">
+							<a href="#" download="measure.json" title="JSON"><img name="geojson_export_button" src="${geoJSONIcon}" class="button-icon" /></a>
+							<a href="#" download="measure.dxf" title="DXF"><img name="dxf_export_button" src="${dxfIcon}" class="button-icon" /></a>
+							<a href="#" download="potree.json5" title="Potree"><img name="potree_export_button" src="${potreeIcon}" class="button-icon" /></a>
+						</div>
+					</div>
+				`);
+		
 				let elDownloadJSON = elExport.find("img[name=geojson_export_button]").parent();
-				elDownloadJSON.click( (event) => {
+				elDownloadJSON.click((event) => {
 					let scene = this.viewer.scene;
 					let measurements = [...scene.measurements, ...scene.profiles, ...scene.volumes];
-
+		
 					if(measurements.length > 0){
 						let geoJson = GeoJSONExporter.toString(measurements);
-
 						let url = window.URL.createObjectURL(new Blob([geoJson], {type: 'data:application/octet-stream'}));
 						elDownloadJSON.attr('href', url);
 					}else {
