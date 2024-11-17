@@ -830,3 +830,41 @@ body{
     margin: 4px 0 !important;
     padding: 0 !important;
 }
+/* Only target the sidebar container */
+#potree_sidebar_container {
+    /* Core sidebar styling */
+    position: absolute;
+    z-index: 1000;
+    width: 350px;
+    height: 100%;
+    overflow-y: auto;
+    background-color: #1a1f24;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    
+    /* Custom scrollbar for WebKit browsers */
+    &::-webkit-scrollbar {
+        width: 4px;
+    }
+    
+    &::-webkit-scrollbar-track {
+        background: #1a1f24;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+        background: #4a90e2;
+        border-radius: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb:hover {
+        background: #357abd;
+    }
+    
+    /* Firefox scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #4a90e2 #1a1f24;
+}
+
+/* Only affect direct children of the sidebar for padding */
+#potree_sidebar_container > div {
+    padding: 0 4px;
+}    
