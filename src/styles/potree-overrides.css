@@ -29,14 +29,14 @@
   z-index: 1000 !important;
 } 
 
-/* Debug borders for Potree elements */
+/* Debug borders for Potree elements
 #potree_render_area { 
   border: 2px solid red !important; 
 }
 
 #potree_sidebar_container { 
   border: 2px solid blue !important; 
-}
+} */
 
 /* Add new styles */
 .potree-panel {
