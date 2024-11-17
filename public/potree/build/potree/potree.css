@@ -680,24 +680,28 @@ body{
     color: black !important;
 }
 
+/** 
+ * OVERRIDES 
+ */
+
 /* Toolbar Layout - Flattened */
 #tools, #navigation, #clipping_tools {
     padding: 4px;
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    background: var(--bg-dark-color);
-    border-bottom: 1px solid var(--border-color);
+    background: transparent; /* Removed gray background */
+    border-bottom: none; /* Removed border */
 }
 
-/* Tool Icons - Consistent Sizing */
+/* Tool Icons - No Background */
 .button-icon {
     width: 32px !important;
     height: 32px !important;
     padding: 4px !important;
     margin: 0 !important;
-    background: var(--bg-dark-color);
-    border: 1px solid var(--border-color);
+    background: transparent !important; /* Removed dark gray background */
+    border: none; /* Removed border */
     border-radius: 4px;
     transition: all 0.2s ease;
     cursor: pointer;
@@ -707,108 +711,14 @@ body{
 }
 
 .button-icon:hover {
-    background: var(--bg-hover-color);
+    background: rgba(255, 255, 255, 0.1) !important; /* Subtle white hover */
     transform: scale(1.05);
 }
 
-.button-icon img {
-    width: 24px;
-    height: 24px;
-    opacity: 0.8;
-}
-
-.button-icon:hover img {
-    opacity: 1;
-}
-
-/* Options Containers */
-#cliptask_options,
-#clipmethod_options,
-#camera_projection_options {
-    width: 100%;
-    padding: 4px;
-    margin-top: 4px;
-    border-top: 1px solid var(--border-color);
-}
-
-/* Option Items */
-.ui-selectgroup-item {
-    background: var(--bg-dark-color);
-    border: 1px solid var(--border-color);
-    color: var(--font-color);
-    padding: 4px 8px;
-    margin: 2px;
-    border-radius: 2px;
-    cursor: pointer;
-}
-
-.ui-selectgroup-item:hover {
-    background: var(--bg-hover-color);
-}
-
-.ui-selectgroup-item.selected {
-    background: var(--color-3);
-    color: white;
-}
-
-/* Speed Slider */
-#sldMoveSpeed.ui-slider {
-    margin: 8px 0;
-    height: 4px;
-    background: var(--bg-dark-color);
-    border: 1px solid var(--border-color);
-}
-
-#sldMoveSpeed .ui-slider-handle {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--color-3);
-    border: 1px solid var(--border-color);
-    top: -4px;
-}
-
-/* Labels and Text */
-.speed-label {
-    color: var(--font-color);
-    margin: 4px 0;
-}
-
-/* Show/Hide Section */
-#measurement_options_show {
-    width: 100%;
-    display: flex;
-    gap: 4px;
-    padding: 4px;
-    margin-top: 4px;
-    border-top: 1px solid var(--border-color);
-}
-
-#measurement_options_show button {
-    flex: 1;
-    padding: 4px 8px;
-    background: var(--bg-dark-color);
-    border: 1px solid var(--border-color);
-    color: var(--font-color);
-    border-radius: 2px;
-    cursor: pointer;
-}
-
-#measurement_options_show button:hover {
-    background: var(--bg-hover-color);
-}
-
-#measurement_options_show button.active {
-    background: var(--color-3);
-    color: white;
-}
-
-/* Section Headers - Minimal */
-.section-header {
-    width: 100%;
-    color: var(--font-color-2);
-    font-size: 0.9em;
-    padding: 4px;
-    margin: 4px 0;
-    border-bottom: 1px solid var(--border-color);
+/* Group Containers (making sure no additional backgrounds exist) */
+.potree-tool-group {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
