@@ -90,9 +90,10 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     const initViewer = async () => {
       try {
         const container = containerRef.current;
+        if (!container) return;
+        
         container.innerHTML = '';
         
-        // Create root container with original Potree styling
         const renderArea = document.createElement('div');
         renderArea.id = 'potree_render_area';
         renderArea.style.cssText = `
@@ -116,7 +117,10 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           showStats: false
         });
 
-        // Modify toggleSidebar to use correct transitions
+        (window as any).viewer = viewer;
+        
+        viewerRef.current = viewer;
+
         viewer.toggleSidebar = () => {
           const renderArea = document.getElementById('potree_render_area');
           const sidebar = document.getElementById('potree_sidebar_container');
@@ -167,8 +171,6 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           }
         });
 
-        viewerRef.current = viewer;
-
         const publicUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
         
         window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
@@ -195,6 +197,8 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     return () => {
       if (viewerRef.current) {
         try {
+          delete (window as any).viewer;
+          
           viewerRef.current.destroy();
           viewerRef.current = null;
         } catch (error) {
