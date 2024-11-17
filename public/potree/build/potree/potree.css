@@ -868,3 +868,37 @@ body{
 #potree_sidebar_container > div {
     padding: 0 4px;
 }    
+/* Slider base - restore visibility while keeping modern look */
+.ui-slider {
+    background-color: rgba(122,129,132,0.3) !important;  /* Restore the visible track */
+    border: none !important;
+    height: 4px !important;
+    position: relative;
+    margin: 12px 0 !important;
+    border-radius: 2px;
+}
+
+/* Keep existing circle styling and alignment */
+.ui-slider-handle {
+    width: 12px !important;
+    height: 12px !important;
+    background: #4a90e2 !important;
+    border-radius: 50% !important;
+    border: 2px solid rgba(255, 255, 255, 0.9) !important;
+    position: absolute !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+    cursor: pointer;
+}
+
+/* Make sure the slider track remains visible */
+.ui-widget-content {
+    background: rgba(122,129,132,0.3) !important;
+    border: none !important;
+}
+
+/* Hover state for better interaction */
+.ui-slider:hover {
+    background-color: rgba(122,129,132,0.5) !important;
+}
