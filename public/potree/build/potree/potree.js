@@ -89165,37 +89165,39 @@ ENDSEC
 			
 			});
 		}
-
 		loadGUI(callback){
-
 			if(callback){
 				this.onGUILoaded(callback);
 			}
-
+		
 			let viewer = this;
 			let sidebarContainer = $('#potree_sidebar_container');
 			sidebarContainer.load(new URL(Potree.scriptPath + '/sidebar.html').href, () => {
 				sidebarContainer.css('width', '300px');
 				sidebarContainer.css('height', '100%');
-
-				let imgMenuToggle = document.createElement('img');
-				imgMenuToggle.src = new URL(Potree.resourcePath + '/icons/menu_button.svg').href;
-				imgMenuToggle.onclick = this.toggleSidebar;
-				imgMenuToggle.classList.add('potree_menu_toggle');
-
+		
+				// Create container for hamburger menu
+				let menuToggle = document.createElement('div');
+				menuToggle.classList.add('potree_menu_toggle');
+				menuToggle.onclick = this.toggleSidebar;
+				
+				// Create three lines
+				for(let i = 0; i < 3; i++) {
+					let line = document.createElement('span');
+					line.classList.add('menu-line');
+					menuToggle.appendChild(line);
+				}
+		
 				let imgMapToggle = document.createElement('img');
 				imgMapToggle.src = new URL(Potree.resourcePath + '/icons/map_icon.png').href;
 				imgMapToggle.style.display = 'none';
 				imgMapToggle.onclick = e => { this.toggleMap(); };
 				imgMapToggle.id = 'potree_map_toggle';
-
-				
-
+		
 				let elButtons = $("#potree_quick_buttons").get(0);
-
-				elButtons.append(imgMenuToggle);
+		
+				elButtons.append(menuToggle);
 				elButtons.append(imgMapToggle);
-
 
 				VRButton.createButton(this.renderer).then(vrButton => {
 
