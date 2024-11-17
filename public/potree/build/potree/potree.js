@@ -80611,14 +80611,24 @@ ENDSEC
 			let elNavigation = $('#navigation');
 			let sldMoveSpeed = $('#sldMoveSpeed');
 			let lblMoveSpeed = $('#lblMoveSpeed');
-	
-			elNavigation.append(this.createToolIcon(
+		
+			// Camera Controls Group
+			let cameraGroup = $(`
+				<div class="potree-tool-group">
+					<div class="potree-tool-group-title">Camera Controls</div>
+					<div class="potree-tool-grid"></div>
+				</div>
+			`);
+			let cameraGrid = cameraGroup.find('.potree-tool-grid');
+		
+			// Add camera control tools
+			cameraGrid.append(this.createToolIcon(
 				Potree.resourcePath + '/icons/earth_controls_1.png',
 				'[title]tt.earth_control',
 				() => { this.viewer.setControls(this.viewer.earthControls); }
 			));
-	
-			elNavigation.append(this.createToolIcon(
+		
+			cameraGrid.append(this.createToolIcon(
 				Potree.resourcePath + '/icons/fps_controls.svg',
 				'[title]tt.flight_control',
 				() => {
@@ -80626,8 +80636,8 @@ ENDSEC
 					this.viewer.fpControls.lockElevation = false;
 				}
 			));
-	
-			elNavigation.append(this.createToolIcon(
+		
+			cameraGrid.append(this.createToolIcon(
 				Potree.resourcePath + '/icons/helicopter_controls.svg',
 				'[title]tt.heli_control',
 				() => { 
@@ -80635,26 +80645,36 @@ ENDSEC
 					this.viewer.fpControls.lockElevation = true;
 				}
 			));
-	
-			elNavigation.append(this.createToolIcon(
+		
+			cameraGrid.append(this.createToolIcon(
 				Potree.resourcePath + '/icons/orbit_controls.svg',
 				'[title]tt.orbit_control',
 				() => { this.viewer.setControls(this.viewer.orbitControls); }
 			));
-	
-			elNavigation.append(this.createToolIcon(
+		
+			// View Tools Group
+			let viewGroup = $(`
+				<div class="potree-tool-group">
+					<div class="potree-tool-group-title">View Tools</div>
+					<div class="potree-tool-grid"></div>
+				</div>
+			`);
+			let viewGrid = viewGroup.find('.potree-tool-grid');
+		
+			// Add view tools
+			viewGrid.append(this.createToolIcon(
 				Potree.resourcePath + '/icons/focus.svg',
 				'[title]tt.focus_control',
 				() => { this.viewer.fitToScreen(); }
 			));
-	
-			elNavigation.append(this.createToolIcon(
+		
+			viewGrid.append(this.createToolIcon(
 				Potree.resourcePath + "/icons/navigation_cube.svg",
 				"[title]tt.navigation_cube_control",
 				() => {this.viewer.toggleNavigationCube();}
 			));
-	
-			elNavigation.append(this.createToolIcon(
+		
+			viewGrid.append(this.createToolIcon(
 				Potree.resourcePath + "/images/compas.svg",
 				"[title]tt.compass",
 				() => {
@@ -80662,86 +80682,80 @@ ENDSEC
 					this.viewer.compass.setVisible(visible);
 				}
 			));
-	
-			elNavigation.append(this.createToolIcon(
+		
+			viewGrid.append(this.createToolIcon(
 				Potree.resourcePath + "/icons/camera_animation.svg",
 				"[title]tt.camera_animation",
 				() => {
 					const animation = CameraAnimation.defaultFromView(this.viewer);
-	
 					viewer.scene.addCameraAnimation(animation);
 				}
 			));
-	
-	
-			elNavigation.append("<br>");
-	
-	
-			elNavigation.append(this.createToolIcon(
-				Potree.resourcePath + "/icons/left.svg",
-				"[title]tt.left_view_control",
-				() => {this.viewer.setLeftView();}
-			));
-	
-			elNavigation.append(this.createToolIcon(
-				Potree.resourcePath + "/icons/right.svg",
-				"[title]tt.right_view_control",
-				() => {this.viewer.setRightView();}
-			));
-	
-			elNavigation.append(this.createToolIcon(
-				Potree.resourcePath + "/icons/front.svg",
-				"[title]tt.front_view_control",
-				() => {this.viewer.setFrontView();}
-			));
-	
-			elNavigation.append(this.createToolIcon(
-				Potree.resourcePath + "/icons/back.svg",
-				"[title]tt.back_view_control",
-				() => {this.viewer.setBackView();}
-			));
-	
-			elNavigation.append(this.createToolIcon(
-				Potree.resourcePath + "/icons/top.svg",
-				"[title]tt.top_view_control",
-				() => {this.viewer.setTopView();}
-			));
-	
-			elNavigation.append(this.createToolIcon(
-				Potree.resourcePath + "/icons/bottom.svg",
-				"[title]tt.bottom_view_control",
-				() => {this.viewer.setBottomView();}
-			));
-	
-	
-	
-	
-	
+		
+			// View Direction Group
+			let directionGroup = $(`
+				<div class="potree-tool-group">
+					<div class="potree-tool-group-title">View Direction</div>
+					<div class="potree-tool-grid"></div>
+				</div>
+			`);
+			let directionGrid = directionGroup.find('.potree-tool-grid');
+		
+			// Add direction controls
+			const directions = [
+				{icon: 'left.svg', title: 'tt.left_view_control', action: () => this.viewer.setLeftView()},
+				{icon: 'right.svg', title: 'tt.right_view_control', action: () => this.viewer.setRightView()},
+				{icon: 'front.svg', title: 'tt.front_view_control', action: () => this.viewer.setFrontView()},
+				{icon: 'back.svg', title: 'tt.back_view_control', action: () => this.viewer.setBackView()},
+				{icon: 'top.svg', title: 'tt.top_view_control', action: () => this.viewer.setTopView()},
+				{icon: 'bottom.svg', title: 'tt.bottom_view_control', action: () => this.viewer.setBottomView()}
+			];
+		
+			directions.forEach(dir => {
+				directionGrid.append(this.createToolIcon(
+					Potree.resourcePath + "/icons/" + dir.icon,
+					`[title]${dir.title}`,
+					dir.action
+				));
+			});
+		
+			// Camera Settings Group
+			let settingsGroup = $(`
+				<div class="potree-tool-group">
+					<div class="potree-tool-group-title">Camera Settings</div>
+				</div>
+			`);
+		
+			// Camera Projection
 			let elCameraProjection = $(`
-			<selectgroup id="camera_projection_options">
-				<option id="camera_projection_options_perspective" value="PERSPECTIVE">Perspective</option>
-				<option id="camera_projection_options_orthigraphic" value="ORTHOGRAPHIC">Orthographic</option>
-			</selectgroup>
-		`);
-			elNavigation.append(elCameraProjection);
+				<div class="camera-projection-container">
+					<selectgroup id="camera_projection_options">
+						<option id="camera_projection_options_perspective" value="PERSPECTIVE">Perspective</option>
+						<option id="camera_projection_options_orthigraphic" value="ORTHOGRAPHIC">Orthographic</option>
+					</selectgroup>
+				</div>
+			`);
+			
+			settingsGroup.append(elCameraProjection);
 			elCameraProjection.selectgroup({title: "Camera Projection"});
-			elCameraProjection.find("input").click( (e) => {
+			elCameraProjection.find("input").click((e) => {
 				this.viewer.setCameraMode(CameraMode[e.target.value]);
 			});
-			let cameraMode = Object.keys(CameraMode)
-				.filter(key => CameraMode[key] === this.viewer.scene.cameraMode);
-			elCameraProjection.find(`input[value=${cameraMode}]`).trigger("click");
-	
+		
+			// Move Speed
+			let speedContainer = $(`
+				<div class="speed-container">
+					<div class="speed-label">Speed: <span id="lblMoveSpeed"></span></div>
+					<div id="sldMoveSpeed"></div>
+				</div>
+			`);
+			settingsGroup.append(speedContainer);
+		
+			// Initialize speed slider
 			let speedRange = new Vector2(1, 10 * 1000);
-	
-			let toLinearSpeed = (value) => {
-				return Math.pow(value, 4) * speedRange.y + speedRange.x;
-			};
-	
-			let toExpSpeed = (value) => {
-				return Math.pow((value - speedRange.x) / speedRange.y, 1 / 4);
-			};
-	
+			let toLinearSpeed = (value) => Math.pow(value, 4) * speedRange.y + speedRange.x;
+			let toExpSpeed = (value) => Math.pow((value - speedRange.x) / speedRange.y, 1 / 4);
+		
 			sldMoveSpeed.slider({
 				value: toExpSpeed(this.viewer.getMoveSpeed()),
 				min: 0,
@@ -80749,12 +80763,24 @@ ENDSEC
 				step: 0.01,
 				slide: (event, ui) => { this.viewer.setMoveSpeed(toLinearSpeed(ui.value)); }
 			});
-	
+		
+			// Add all groups to navigation
+			elNavigation.append(cameraGroup);
+			elNavigation.append(viewGroup);
+			elNavigation.append(directionGroup);
+			elNavigation.append(settingsGroup);
+		
+			// Initialize camera projection
+			let cameraMode = Object.keys(CameraMode)
+				.filter(key => CameraMode[key] === this.viewer.scene.cameraMode);
+			elCameraProjection.find(`input[value=${cameraMode}]`).trigger("click");
+		
+			// Set up speed change listener
 			this.viewer.addEventListener('move_speed_changed', (event) => {
 				lblMoveSpeed.html(this.viewer.getMoveSpeed().toFixed(1));
 				sldMoveSpeed.slider({value: toExpSpeed(this.viewer.getMoveSpeed())});
 			});
-	
+		
 			lblMoveSpeed.html(this.viewer.getMoveSpeed().toFixed(1));
 		}
 	

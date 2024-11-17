@@ -946,3 +946,56 @@ body{
     border-bottom: 1px solid var(--border-color);
     text-align: center;
 }
+/* Navigation specific styles */
+.camera-projection-container {
+    padding: 8px;
+    margin-top: 8px;
+}
+
+.speed-container {
+    padding: 8px;
+    margin-top: 8px;
+}
+
+.speed-label {
+    color: var(--font-color);
+    margin-bottom: 4px;
+}
+
+#sldMoveSpeed.ui-slider {
+    margin: 8px 0;
+    height: 4px;
+    background: var(--bg-dark-color);
+    border: 1px solid var(--border-color);
+}
+
+#sldMoveSpeed .ui-slider-handle {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-3);
+    border: 1px solid var(--border-color);
+    top: -4px;
+}
+
+/* Make navigation groups more compact */
+#navigation .potree-tool-group {
+    margin-bottom: 8px;
+}
+
+#navigation .potree-tool-grid {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+/* Camera projection buttons */
+#camera_projection_options .ui-selectgroup-item {
+    background: var(--bg-dark-color);
+    border: 1px solid var(--border-color);
+    color: var(--font-color);
+    padding: 4px 8px;
+}
+
+#camera_projection_options .ui-selectgroup-item.selected {
+    background: var(--color-3);
+    color: white;
+}
