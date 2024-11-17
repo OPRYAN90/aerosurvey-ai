@@ -1,4 +1,3 @@
-
 /* CSS - Cascading Style Sheet */
 /* Palette color codes */
 /* Palette URL: http://paletton.com/#uid=13p0u0kex8W2uqu8af7lEqaulDE */
@@ -779,4 +778,36 @@ body{
 
 #scene_export {
     margin: 4px 0;
+}
+
+/* Update accordion hover state */
+.accordion > h3:hover {
+    background-color: #2D6D82 !important; /* Using the blue from your color palette */
+}
+
+/* Update slider styling */
+.ui-slider {
+    height: 4px;
+    background-color: rgba(122,129,132,0.3) !important; /* Using color-primary-1 with opacity */
+    border: none !important;
+    border-radius: 2px;
+}
+
+.ui-slider-handle {
+    width: 14px !important;
+    height: 14px !important;
+    border-radius: 50% !important;
+    background: #108FB9 !important; /* Using color-primary-4 */
+    border: none !important;
+    cursor: pointer;
+    margin-top: -5px !important;
+    transition: transform 0.2s;
+}
+
+.ui-slider-handle:hover {
+    transform: scale(1.2);
+}
+
+.ui-slider:hover {
+    background-color: rgba(122,129,132,0.5) !important;
 }
