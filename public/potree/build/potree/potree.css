@@ -754,8 +754,8 @@ body{
 .export-container {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px;
+    gap: 4px;
+    padding: 2px;
 }
 
 .export-label {
@@ -777,7 +777,7 @@ body{
 }
 
 #scene_export {
-    margin: 4px 0;
+    margin: 2px 0;
 }
 
 /* Update accordion hover state */
@@ -810,4 +810,23 @@ body{
 
 .ui-slider:hover {
     background-color: rgba(122,129,132,0.5) !important;
+}
+
+/* Reduce spacing in accordion sections */
+.accordion > div {
+    padding: 4px 0 !important;
+}
+
+.pv-menu-list {
+    margin: 4px 0 !important;
+}
+
+.pv-menu-list > * {
+    margin: 2px 20px !important;
+}
+
+/* Reduce divider spacing */
+.divider {
+    margin: 4px 0 !important;
+    padding: 0 !important;
 }
