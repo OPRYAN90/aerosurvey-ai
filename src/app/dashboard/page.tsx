@@ -1,14 +1,38 @@
 "use client"
 
 import { useRouter } from 'next/navigation'
-import { FolderPlus, ArrowRight } from 'lucide-react'
+import { FolderPlus, ArrowRight, Activity, Map, Clock, AlertTriangle } from 'lucide-react'
 import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { useEffect, useState } from 'react'
+
+interface ProjectStats {
+  totalProjects: number
+  activeProjects: number
+  totalDistance: number
+  averageIssuesPerKm: number
+  recentActivity: {
+    date: string
+    description: string
+  }[]
+}
 
 export default function Dashboard() {
   const router = useRouter()
-  // This would eventually come from your state management / backend
-  const hasProjects = false
+  const [stats, setStats] = useState<ProjectStats>({
+    totalProjects: 3,
+    activeProjects: 2,
+    totalDistance: 150.5,
+    averageIssuesPerKm: 2.3,
+    recentActivity: [
+      { date: '2024-03-20', description: 'New analysis completed for Highway 101' },
+      { date: '2024-03-19', description: 'Started scan of Mountain View roads' },
+      { date: '2024-03-18', description: 'Updated Downtown project data' },
+    ]
+  })
+
+  // In a real implementation, you would fetch this data from your backend
+  const hasProjects = stats.totalProjects > 0
 
   if (!hasProjects) {
     return (
@@ -38,7 +62,81 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-blue-900 pt-20">
-      <div>Dashboard with project insights</div>
+      <div className="container mx-auto px-4">
+        <h1 className="text-3xl font-bold text-white mb-8">Dashboard Overview</h1>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-black/40 border-white/10 backdrop-blur-lg">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <FolderPlus className="w-5 h-5 text-blue-500" />
+                Projects
+              </CardTitle>
+              <CardDescription className="text-2xl font-bold text-white">
+                {stats.totalProjects}
+                <span className="text-sm font-normal text-white/70 ml-2">
+                  ({stats.activeProjects} active)
+                </span>
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-black/40 border-white/10 backdrop-blur-lg">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Map className="w-5 h-5 text-green-500" />
+                Total Distance
+              </CardTitle>
+              <CardDescription className="text-2xl font-bold text-white">
+                {stats.totalDistance} km
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-black/40 border-white/10 backdrop-blur-lg">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                Issues per KM
+              </CardTitle>
+              <CardDescription className="text-2xl font-bold text-white">
+                {stats.averageIssuesPerKm}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-black/40 border-white/10 backdrop-blur-lg">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-purple-500" />
+                Activity
+              </CardTitle>
+              <CardDescription className="text-2xl font-bold text-white">
+                {stats.recentActivity.length} updates
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+
+        <Card className="bg-black/40 border-white/10 backdrop-blur-lg">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-blue-500" />
+              Recent Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {stats.recentActivity.map((activity, index) => (
+                <div key={index} className="flex items-center gap-4 text-white/70">
+                  <div className="w-24 text-sm">{activity.date}</div>
+                  <div>{activity.description}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   )
 }
