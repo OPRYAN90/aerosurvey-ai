@@ -38,4 +38,27 @@
   padding: 4px !important;
   background: rgba(0, 0, 0, 0.3) !important;
   border-radius: 4px !important;
+}
+
+/* Map container customizations */
+#potree_map {
+  margin: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#potree_map .ol-zoom {
+  top: 8px;
+  left: 8px;
+}
+
+#potree_map .ol-zoom button {
+  background: rgba(0,0,0,0.5);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+#potree_map .ol-scale-line {
+  background: rgba(0,0,0,0.5);
+  border-radius: 2px;
 } 

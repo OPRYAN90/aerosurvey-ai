@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Project } from '@/types/project';
 
+// Add type declaration for OpenLayers on window
+declare global {
+  interface Window {
+    ol: any; // We could define proper types but using any for brevity
+    Potree: any;
+  }
+}
+
 interface PotreeViewerProps {
   project: Project;
   onError?: (error: string) => void;
@@ -44,11 +52,13 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           '/potree/libs/jquery-ui/jquery-ui.min.css',
           '/potree/libs/spectrum/spectrum.css',
           '/potree/libs/jstree/themes/mixed/style.css',
+          '/potree/libs/openlayers3/ol.css',
           '/potree/build/potree/potree.css'
         ]);
 
         const scripts = [
           '/potree/libs/jquery/jquery-3.1.1.min.js',
+          '/potree/libs/openlayers3/ol.js',
           '/potree/libs/three.js/build/three.min.js',
           '/potree/libs/other/BinaryHeap.js',
           '/potree/libs/tween/tween.min.js',
@@ -151,22 +161,52 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
               overflow-y: auto;
               transition: transform 0.35s ease;
             `;
-          }
 
-          // Add menu toggle styling
-          const menuToggle = document.querySelector('.potree_menu_toggle');
-          if (menuToggle) {
-            const imgElement = menuToggle.querySelector('img');
-            if (imgElement) {
-              imgElement.style.cssText = `
-                width: 24px;
-                height: 24px;
-                padding: 4px;
-                margin: 4px;
-                background: rgba(0, 0, 0, 0.3);
-                border-radius: 4px;
-                cursor: pointer;
-              `;
+            if (typeof window.ol === 'undefined') {
+              console.error('OpenLayers not loaded');
+              return;
+            }
+
+            const mapContainer = document.createElement('div');
+            mapContainer.id = 'potree_map';
+            mapContainer.style.cssText = `
+              position: relative;
+              height: 300px;
+              margin: 8px;
+              background: rgba(0,0,0,0.5);
+              border: 1px solid rgba(255,255,255,0.1);
+              border-radius: 4px;
+              overflow: hidden;
+            `;
+            sidebar.appendChild(mapContainer);
+
+            try {
+              const map = new window.ol.Map({
+                target: 'potree_map',
+                layers: [
+                  new window.ol.layer.Tile({
+                    source: new window.ol.source.OSM()
+                  })
+                ],
+                view: new window.ol.View({
+                  center: [0, 0],
+                  zoom: 2
+                }),
+                controls: [
+                  new window.ol.control.Zoom(),
+                  new window.ol.control.ScaleLine()
+                ]
+              });
+
+              viewer.addEventListener('camera_changed', () => {
+                const camera = viewer.scene.getActiveCamera();
+                const position = camera.position;
+                
+                const mapPosition = window.ol.proj.fromLonLat([position.x, position.z]);
+                map.getView().setCenter(mapPosition);
+              });
+            } catch (error) {
+              console.error('Error initializing OpenLayers map:', error);
             }
           }
         });

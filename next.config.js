@@ -10,6 +10,7 @@ const nextConfig = {
         path: false,
       };
     }
+    config.externals = [...(config.externals || []), { ol: 'ol' }];
     return config;
   }
 };
