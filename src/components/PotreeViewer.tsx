@@ -20,6 +20,9 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isDependenciesLoaded, setIsDependenciesLoaded] = useState(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout>();
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const mapRef = useRef<any>(null);
 
   useEffect(() => {
     const debugDOM = () => {
@@ -104,6 +107,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         
         container.innerHTML = '';
         
+        // Create render area
         const renderArea = document.createElement('div');
         renderArea.id = 'potree_render_area';
         renderArea.style.cssText = `
@@ -117,6 +121,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         `;
         container.appendChild(renderArea);
 
+        // Initialize viewer
         const viewer = new window.Potree.Viewer(renderArea, {
           useDefaultRenderLoop: true,
           pointBudget: 1_000_000,
@@ -127,62 +132,37 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           showStats: false
         });
 
-        (window as any).viewer = viewer;
-        
         viewerRef.current = viewer;
-
-        viewer.toggleSidebar = () => {
-          const renderArea = document.getElementById('potree_render_area');
-          const sidebar = document.getElementById('potree_sidebar_container');
-          
-          if (renderArea && sidebar) {
-            const isVisible = renderArea.style.left !== '0px';
-            
-            renderArea.style.left = isVisible ? '0px' : '300px';
-            sidebar.style.transform = isVisible ? 
-              'translateX(-300px)' : 'translateX(0)';
-            sidebar.style.transition = 'transform 0.35s ease';
-          }
-        };
-
+        
+        // Let Potree handle GUI initialization
         viewer.loadGUI(() => {
           viewer.setLanguage('en');
           
-          const sidebar = document.getElementById('potree_sidebar_container');
-          if (sidebar) {
-            sidebar.style.cssText = `
-              position: absolute;
-              left: 0;
-              top: 0;
-              bottom: 0;
-              width: 300px;
-              background-color: rgba(0, 0, 0, 0.8);
-              z-index: 10;
-              overflow-y: auto;
-              transition: transform 0.35s ease;
-            `;
+          // Only modify the map after GUI is loaded
+          const sidebarElement = document.getElementById('potree_sidebar_container');
+          const mapElement = document.getElementById('potree_map');
+          
+          if (mapElement && sidebarElement) {
+            // Create map section container
+            const mapSection = document.createElement('div');
+            mapSection.className = 'map-section';
+            sidebarElement.insertBefore(mapSection, sidebarElement.firstChild);
+            mapSection.appendChild(mapElement);
 
-            if (typeof window.ol === 'undefined') {
-              console.error('OpenLayers not loaded');
-              return;
-            }
-
-            const mapContainer = document.createElement('div');
-            mapContainer.id = 'potree_map';
-            mapContainer.style.cssText = `
-              position: relative;
+            // Style adjustments for the map
+            mapElement.style.cssText = `
               height: 300px;
               margin: 8px;
-              background: rgba(0,0,0,0.5);
-              border: 1px solid rgba(255,255,255,0.1);
               border-radius: 4px;
               overflow: hidden;
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              background: rgba(0, 0, 0, 0.5);
             `;
-            sidebar.appendChild(mapContainer);
 
+            // Initialize OpenLayers map
             try {
               const map = new window.ol.Map({
-                target: 'potree_map',
+                target: mapElement,
                 layers: [
                   new window.ol.layer.Tile({
                     source: new window.ol.source.OSM()
@@ -198,19 +178,20 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
                 ]
               });
 
+              // Update map on camera change
               viewer.addEventListener('camera_changed', () => {
                 const camera = viewer.scene.getActiveCamera();
                 const position = camera.position;
-                
                 const mapPosition = window.ol.proj.fromLonLat([position.x, position.z]);
                 map.getView().setCenter(mapPosition);
               });
             } catch (error) {
-              console.error('Error initializing OpenLayers map:', error);
+              console.error('Error initializing map:', error);
             }
           }
         });
 
+        // Load point cloud
         const publicUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
         
         window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
@@ -237,10 +218,25 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     return () => {
       if (viewerRef.current) {
         try {
-          delete (window as any).viewer;
+          // Clean up the viewer
+          if (viewerRef.current.scene) {
+            viewerRef.current.scene.pointclouds.forEach((pointcloud: any) => {
+              viewerRef.current.scene.removePointCloud(pointcloud);
+            });
+            viewerRef.current.scene.dispose();
+          }
           
-          viewerRef.current.destroy();
+          if (viewerRef.current.renderer) {
+            viewerRef.current.renderer.dispose();
+          }
+          
+          delete (window as any).viewer;
           viewerRef.current = null;
+          
+          // Clean up container
+          if (containerRef.current) {
+            containerRef.current.innerHTML = '';
+          }
         } catch (error) {
           console.warn('Error during cleanup:', error);
         }
