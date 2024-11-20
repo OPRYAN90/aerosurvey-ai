@@ -107,7 +107,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         
         container.innerHTML = '';
         
-        // Create render area
+        // Create render area first
         const renderArea = document.createElement('div');
         renderArea.id = 'potree_render_area';
         renderArea.style.cssText = `
@@ -121,7 +121,20 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         `;
         container.appendChild(renderArea);
 
-        // Initialize viewer
+        // Add quick buttons container
+        const quickButtons = document.createElement('div');
+        quickButtons.id = 'potree_quick_buttons';
+        quickButtons.style.cssText = `
+          position: absolute;
+          left: 10px;
+          top: 10px;
+          z-index: 1000;
+          display: flex;
+          gap: 8px;
+        `;
+        renderArea.appendChild(quickButtons);
+
+        // Initialize viewer with existing settings...
         const viewer = new window.Potree.Viewer(renderArea, {
           useDefaultRenderLoop: true,
           pointBudget: 1_000_000,
@@ -138,56 +151,69 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         viewer.loadGUI(() => {
           viewer.setLanguage('en');
           
-          // Only modify the map after GUI is loaded
-          const sidebarElement = document.getElementById('potree_sidebar_container');
-          const mapElement = document.getElementById('potree_map');
-          
-          if (mapElement && sidebarElement) {
-            // Create map section container
-            const mapSection = document.createElement('div');
-            mapSection.className = 'map-section';
-            sidebarElement.insertBefore(mapSection, sidebarElement.firstChild);
-            mapSection.appendChild(mapElement);
-
-            // Style adjustments for the map
-            mapElement.style.cssText = `
-              height: 300px;
-              margin: 8px;
-              border-radius: 4px;
-              overflow: hidden;
-              border: 1px solid rgba(255, 255, 255, 0.1);
-              background: rgba(0, 0, 0, 0.5);
+          // Move menu toggle and add map toggle
+          const existingMenuToggle = document.querySelector('.potree_menu_toggle');
+          if (existingMenuToggle && quickButtons) {
+            quickButtons.appendChild(existingMenuToggle);
+            
+            const mapToggle = document.createElement('div');
+            mapToggle.className = 'potree_map_toggle';
+            mapToggle.innerHTML = `
+              <img src="/potree/resources/icons/map.svg" class="map-icon" />
             `;
+            quickButtons.appendChild(mapToggle);
+
+            // Create floating map container
+            const mapContainer = document.createElement('div');
+            mapContainer.id = 'potree_map';
+            mapContainer.style.cssText = `
+              position: absolute;
+              z-index: 100;
+              width: 400px;
+              height: 400px;
+              top: 50px;
+              left: -420px;
+              border-radius: 4px;
+              background: rgba(0, 0, 0, 0.5);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              transition: left 0.35s ease;
+              overflow: hidden;
+            `;
+            renderArea.appendChild(mapContainer);
+
+            // Toggle map visibility
+            let isMapVisible = false;
+            mapToggle.onclick = () => {
+              isMapVisible = !isMapVisible;
+              mapContainer.style.left = isMapVisible ? '10px' : '-420px';
+              mapToggle.classList.toggle('active');
+            };
 
             // Initialize OpenLayers map
-            try {
-              const map = new window.ol.Map({
-                target: mapElement,
-                layers: [
-                  new window.ol.layer.Tile({
-                    source: new window.ol.source.OSM()
-                  })
-                ],
-                view: new window.ol.View({
-                  center: [0, 0],
-                  zoom: 2
-                }),
-                controls: [
-                  new window.ol.control.Zoom(),
-                  new window.ol.control.ScaleLine()
-                ]
-              });
+            const map = new window.ol.Map({
+              target: mapContainer,
+              layers: [
+                new window.ol.layer.Tile({
+                  source: new window.ol.source.OSM()
+                })
+              ],
+              view: new window.ol.View({
+                center: [0, 0],
+                zoom: 2
+              }),
+              controls: [
+                new window.ol.control.Zoom(),
+                new window.ol.control.ScaleLine()
+              ]
+            });
 
-              // Update map on camera change
-              viewer.addEventListener('camera_changed', () => {
-                const camera = viewer.scene.getActiveCamera();
-                const position = camera.position;
-                const mapPosition = window.ol.proj.fromLonLat([position.x, position.z]);
-                map.getView().setCenter(mapPosition);
-              });
-            } catch (error) {
-              console.error('Error initializing map:', error);
-            }
+            // Update map on camera change
+            viewer.addEventListener('camera_changed', () => {
+              const camera = viewer.scene.getActiveCamera();
+              const position = camera.position;
+              const mapPosition = window.ol.proj.fromLonLat([position.x, position.z]);
+              map.getView().setCenter(mapPosition);
+            });
           }
         });
 

@@ -1006,3 +1006,57 @@ body{
   background: rgba(0,0,0,0.5) !important;
   border-radius: 2px !important;
 }
+
+/* Map toggle button styling */
+.potree_map_toggle {
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.potree_map_toggle:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.potree_map_toggle.active {
+  background: rgba(0, 60, 136, 0.5);
+}
+
+.map-icon {
+  width: 24px;
+  height: 24px;
+  filter: invert(1);
+}
+
+/* Map container controls */
+#potree_map .ol-zoom {
+  top: 8px;
+  left: 8px;
+}
+
+#potree_map .ol-zoom button {
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#potree_map .ol-scale-line {
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 2px;
+}
+
+/* Update existing OpenLayers controls */
+.ol-control button {
+  background-color: rgba(0, 60, 136, 0.5) !important;
+}
+
+.ol-control button:hover {
+  background-color: rgba(0, 60, 136, 0.7) !important;
+}
