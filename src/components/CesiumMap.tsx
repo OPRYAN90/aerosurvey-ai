@@ -11,7 +11,6 @@ import "cesium/Build/Cesium/Widgets/widgets.css"
 // Initialize Cesium Ion access token
 Cesium.Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_ACCESS_TOKEN || '';
 
-// Add this type declaration at the top of the file
 declare global {
   interface Window {
     CESIUM_BASE_URL: string;
@@ -20,8 +19,8 @@ declare global {
 
 export default function CesiumMap() {
   useEffect(() => {
-    // Configure the default Cesium assets location
-    window.CESIUM_BASE_URL = '/static/cesium';
+    // Update the base URL to point to the public directory
+    window.CESIUM_BASE_URL = '/cesium';
   }, []);
 
   return (

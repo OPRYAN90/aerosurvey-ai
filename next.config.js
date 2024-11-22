@@ -22,7 +22,7 @@ const nextConfig = {
               path.dirname(require.resolve('cesium')),
               'Build/Cesium'
             ),
-            to: 'static/cesium',
+            to: path.join(__dirname, 'public/cesium'),
           },
         ],
       })
@@ -30,7 +30,15 @@ const nextConfig = {
 
     return config;
   },
-  transpilePackages: ['resium', 'cesium']
+  transpilePackages: ['resium', 'cesium'],
+  async rewrites() {
+    return [
+      {
+        source: '/cesium/:path*',
+        destination: '/cesium/:path*',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
