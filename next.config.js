@@ -1,5 +1,6 @@
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const path = require('path');
+const webpack = require('webpack');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -19,12 +20,17 @@ const nextConfig = {
         patterns: [
           {
             from: path.join(
-              path.dirname(require.resolve('cesium')),
-              'Build/Cesium'
+              'node_modules/cesium/Build/Cesium'
             ),
-            to: path.join(__dirname, 'public/cesium'),
-          },
-        ],
+            to: '../public/cesium'
+          }
+        ]
+      })
+    );
+
+    config.plugins.push(
+      new webpack.DefinePlugin({
+        CESIUM_BASE_URL: JSON.stringify('/cesium')
       })
     );
 

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "node node_modules/copy-webpack-plugin/dist/index.js"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -16,8 +17,8 @@
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-select": "^2.0.0",
     "@radix-ui/react-slot": "^1.0.2",
-    "@react-three/drei": "^9.88.7",
-    "@react-three/fiber": "^8.15.11",
+    "@react-three/drei": "^9.117.3",
+    "@react-three/fiber": "^8.17.10",
     "cesium": "^1.123.1",
     "class-variance-authority": "0.7.0",
     "clsx": "2.0.0",
@@ -33,7 +34,8 @@
     "resium": "^1.18.3",
     "tailwind-merge": "2.1.0",
     "tailwindcss-animate": "^1.0.7",
-    "three": "^0.157.0"
+    "three": "^0.160.0",
+    "three-mesh-bvh": "^0.8.3"
   },
   "devDependencies": {
     "@types/node": "20.9.0",
