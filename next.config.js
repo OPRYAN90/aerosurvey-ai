@@ -1,3 +1,6 @@
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverRuntimeConfig: {
@@ -10,8 +13,25 @@ const nextConfig = {
         path: false,
       };
     }
+
+    config.plugins.push(
+      new CopyWebpackPlugin({
+        patterns: [
+          {
+            from: path.join(
+              path.dirname(require.resolve('cesium')),
+              'Build/Cesium'
+            ),
+            to: 'static/cesium',
+          },
+        ],
+      })
+    );
+
     return config;
-  }
+  },
+  transpilePackages: ['resium', 'cesium']
 };
 
 module.exports = nextConfig;
+

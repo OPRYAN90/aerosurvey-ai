@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
-import { LogOut, LayoutDashboard, FolderOpen } from 'lucide-react'
+import { LogOut, LayoutDashboard, FolderOpen, Map } from 'lucide-react'
 import { useEffect } from 'react'
 
 export function Navbar() {
@@ -71,6 +71,16 @@ export function Navbar() {
                 <Link href="/projects">
                   <FolderOpen className="w-4 h-4" />
                   Projects
+                </Link>
+              </Button>
+              <Button
+                variant="ghost"
+                className="navbar-button !text-white hover:!text-blue-400 transition-colors flex items-center gap-2 [&>a]:!text-white [&>a]:hover:!text-blue-400"
+                asChild
+              >
+                <Link href="/map">
+                  <Map className="w-4 h-4" />
+                  Map
                 </Link>
               </Button>
             </nav>
