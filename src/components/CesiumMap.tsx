@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect } from 'react'
-import { Viewer, Entity } from 'resium'
-import { Cartesian3, Color } from 'cesium'
+import { Viewer, CameraFlyTo } from 'resium'
+import { Cartesian3 } from 'cesium'
 import * as Cesium from 'cesium'
 
 // Import the CSS directly
@@ -28,13 +28,20 @@ export default function CesiumMap() {
       full
       timeline={false}
       animation={false}
-      baseLayerPicker={false}
+      baseLayerPicker={true}
+      navigationHelpButton={true}
+      homeButton={true}
+      geocoder={true}
+      sceneModePicker={true}
       className="w-full h-full"
+      scene3DOnly={false}
+      selectionIndicator={true}
+      infoBox={true}
+      navigationInstructionsInitiallyVisible={false}
     >
-      <Entity
-        position={Cartesian3.fromDegrees(-74.0060, 40.7128, 1000)}
-        point={{ pixelSize: 10, color: Color.RED }}
-        description="Sample Point"
+      <CameraFlyTo
+        duration={0}
+        destination={Cartesian3.fromDegrees(-98.35, 39.50, 5000000)}
       />
     </Viewer>
   );
