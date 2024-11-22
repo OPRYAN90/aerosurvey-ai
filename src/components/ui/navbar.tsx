@@ -13,10 +13,10 @@ export function Navbar() {
   
   const isAuthPage = pathname === '/signin' || pathname === '/login' || pathname === '/signup'
   const isAuthedRoute = pathname === '/dashboard' || pathname === '/projects'
-  const isProjectViewPage = pathname.startsWith('/projects/') && pathname !== '/projects'
+  const isFullscreenPage = pathname.startsWith('/projects/') && pathname !== '/projects' || pathname === '/map'
 
   useEffect(() => {
-    if (isProjectViewPage) {
+    if (isFullscreenPage) {
       const checkButtonStyles = () => {
         const buttons = document.querySelectorAll('.navbar-button');
         buttons.forEach(button => {
@@ -28,7 +28,7 @@ export function Navbar() {
       checkButtonStyles();
       setTimeout(checkButtonStyles, 1000);
     }
-  }, [isProjectViewPage]);
+  }, [isFullscreenPage]);
 
   if (isAuthPage) {
     return null
@@ -37,7 +37,7 @@ export function Navbar() {
   return (
     <nav className={`
       fixed top-0 left-0 right-0 h-14 
-      ${isProjectViewPage 
+      ${isFullscreenPage 
         ? "bg-black border-b border-white/10 backdrop-blur-sm"
         : "absolute bg-transparent"
       } 
@@ -50,7 +50,7 @@ export function Navbar() {
           </span>
         </Link>
         
-        {isAuthedRoute || isProjectViewPage ? (
+        {isAuthedRoute || isFullscreenPage ? (
           <div className="flex items-center gap-4">
             <nav className="flex items-center gap-2 mr-4">
               <Button
