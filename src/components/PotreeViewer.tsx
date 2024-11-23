@@ -14,28 +14,6 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   const loadingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    const debugDOM = () => {
-      console.log('Current DOM structure:', {
-        container: containerRef.current,
-        renderArea: document.getElementById('potree_render_area'),
-        sidebar: document.getElementById('potree_sidebar_container'),
-        map: document.getElementById('potree_map')
-      });
-
-      if (viewerRef.current) {
-        console.log('Viewer state:', {
-          viewer: viewerRef.current,
-          scene: viewerRef.current.scene,
-          gui: viewerRef.current.gui
-        });
-      }
-    };
-
-    const debugInterval = setInterval(debugDOM, 2000);
-    return () => clearInterval(debugInterval);
-  }, []);
-
-  useEffect(() => {
     const loadDependencies = async () => {
       try {
         console.log('Starting to load dependencies...');
@@ -114,12 +92,22 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           edlEnabled: true,
           background: 'rgb(32, 32, 32)',
           useEDL: true,
-          showStats: false
+          showStats: false,
+          freeze: false
         });
 
         (window as any).viewer = viewer;
         
         viewerRef.current = viewer;
+
+        viewer.addEventListener('update', () => {
+          if (viewer.scene.pointclouds.length > 0) {
+            const cloud = viewer.scene.pointclouds[0];
+            if (cloud && !cloud.hierarchyInitialized) {
+              cloud.hierarchyInitialized = true;
+            }
+          }
+        });
 
         viewer.toggleSidebar = () => {
           const renderArea = document.getElementById('potree_render_area');
