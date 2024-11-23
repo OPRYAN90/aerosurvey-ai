@@ -1,6 +1,7 @@
 import { Project } from '@/types/project';
+import { CoverageAnalysisService } from './coverage-analysis';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 
 export class ConversionService {
   static async startConversion(project: Project, authToken: string): Promise<void> {
@@ -14,6 +15,16 @@ export class ConversionService {
     });
 
     try {
+      // Analyze coverage area first
+      if (project.fileUrl) {
+        const coverage = await CoverageAnalysisService.analyzeLazFile(project.fileUrl);
+        
+        // Update project with coverage information
+        await updateDoc(doc(db, 'projects', project.id!), {
+          coverageArea: coverage
+        });
+      }
+
       const response = await fetch('/api/convert', {
         method: 'POST',
         headers: {

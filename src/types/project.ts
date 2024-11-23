@@ -13,6 +13,18 @@ export interface Project {
   convertedUrl?: string;
   conversionProgress?: number;
   conversionError?: string;
+  coverageArea?: {
+    bounds: {
+      minX: number;
+      minY: number;
+      maxX: number;
+      maxY: number;
+    };
+    center?: {
+      longitude: number;
+      latitude: number;
+    };
+  };
 }
 
 export interface PointCloudData {
