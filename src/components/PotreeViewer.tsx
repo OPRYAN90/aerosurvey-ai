@@ -168,98 +168,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           elToolbar.append(createToolIcon(
             '/icons/ground.svg',
             'Ground Segmentation',
-            async () => {
-              console.log('Ground segmentation tool clicked, current state:', !isGroundSegmentationActive);
-              
-              const pointcloud = viewer.scene.pointclouds[0];
-              if (!pointcloud) {
-                console.error('No point cloud available');
-                return;
-              }
-
-              if (isGroundSegmentationActive) {
-                console.log('Deactivating ground segmentation...');
-                
-                // Reset to default visualization
-                pointcloud.material.pointColorType = window.Potree.PointColorType.RGB;
-                pointcloud.material.activeAttributeName = 'rgba';
-                delete pointcloud.material.classifications;
-                
-                viewer.scene.dispatchEvent({
-                  type: 'material_changed',
-                  target: pointcloud
-                });
-
-                setIsGroundSegmentationActive(false);
-                console.log('Ground segmentation deactivated');
-                
-              } else {
-                try {
-                  console.log('Activating ground segmentation...');
-                  setIsApplyingSegmentation(true);
-
-                  // Fetch ground classification data
-                  console.log('Fetching classification data for project:', project.id);
-                  const response = await fetch(`/api/projects/${project.id}/ground-classification`, {
-                    headers: {
-                      'Authorization': `Bearer ${await getAuthToken()}`
-                    }
-                  });
-                  const data = await response.json();
-                  
-                  if (!data.classification) {
-                    throw new Error('No ground classification data found');
-                  }
-
-                  console.log('Received classification data:', {
-                    groundPoints: data.classification.ground.length,
-                    total: pointcloud.numPoints
-                  });
-
-                  // Create classification material
-                  console.log('Setting up ground classification material...');
-                  const groundMaterial = new window.Potree.PointCloudMaterial();
-                  groundMaterial.color = new window.THREE.Color(1, 0, 0); // Red for ground points
-                  
-                  // Create classification override
-                  const classification = new window.Potree.Classification();
-                  classification.name = 'Ground Points';
-                  classification.color = new window.THREE.Color(1, 0, 0);
-                  pointcloud.material.classifications = {
-                    0: classification
-                  };
-
-                  console.log('Applying classification settings to point cloud...');
-                  // Set point colors based on classification
-                  pointcloud.material.pointColorType = window.Potree.PointColorType.CLASSIFICATION;
-                  pointcloud.material.activeAttributeName = 'classification';
-
-                  // Apply classification to points
-                  console.log('Updating point classifications...');
-                  const { ground } = data.classification;
-                  pointcloud.updateClassification(ground, 0);  // 0 is our custom ground class
-                  
-                  viewer.scene.dispatchEvent({
-                    type: 'material_changed',
-                    target: pointcloud
-                  });
-
-                  setIsGroundSegmentationActive(true);
-                  console.log('Ground segmentation activated successfully');
-
-                } catch (error) {
-                  console.error('Error applying ground segmentation:', error);
-                  if (error instanceof Error && error.message === 'User not authenticated') {
-                    onError?.('Please sign in to use this feature');
-                  } else {
-                    onError?.(error instanceof Error ? error.message : 'Failed to apply ground segmentation');
-                  }
-                  setIsGroundSegmentationActive(false);
-                } finally {
-                  setIsApplyingSegmentation(false);
-                }
-              }
-            }
+            toggleGroundSegmentation
           ));
         });
 
@@ -289,12 +198,22 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     return () => {
       if (viewerRef.current) {
         try {
-          delete (window as any).viewer;
+          // Proper cleanup for Potree viewer
+          const viewer = viewerRef.current;
+          if (viewer.scene) {
+            // Remove all point clouds
+            viewer.scene.pointclouds.forEach((pointcloud: any) => {
+              viewer.scene.removePointCloud(pointcloud);
+            });
+          }
+          // Remove event listeners
+          viewer.removeEventListeners();
           
-          viewerRef.current.destroy();
+          // Clear the reference
           viewerRef.current = null;
+          delete (window as any).viewer;
         } catch (error) {
-          console.warn('Error during cleanup:', error);
+          console.warn('Error during viewer cleanup:', error);
         }
       }
     };
@@ -375,6 +294,95 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
       throw new Error('User not authenticated');
     }
     return user.getIdToken();
+  };
+
+  const toggleGroundSegmentation = async () => {
+    console.log('Ground segmentation tool clicked, current state:', !isGroundSegmentationActive);
+    
+    const pointcloud = viewer.scene.pointclouds[0];
+    if (!pointcloud) {
+      console.error('No point cloud available');
+      return;
+    }
+
+    if (isGroundSegmentationActive) {
+      console.log('Deactivating ground segmentation...');
+      
+      // Reset visualization
+      pointcloud.material.pointColorType = window.Potree.PointColorType.RGB;
+      pointcloud.material.activeAttributeName = null;
+      
+      // Reset material classifications
+      pointcloud.material.uniforms.classificationLUT.value = [];
+      
+      viewer.scene.dispatchEvent({
+        type: 'material_changed',
+        target: pointcloud
+      });
+
+      setIsGroundSegmentationActive(false);
+      
+    } else {
+      try {
+        console.log('Activating ground segmentation...');
+        setIsApplyingSegmentation(true);
+
+        const response = await fetch(`/api/projects/${project.id}/ground-classification`, {
+          headers: {
+            'Authorization': `Bearer ${await getAuthToken()}`
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (!data.classification) {
+          throw new Error('No ground classification data found');
+        }
+
+        console.log('Received classification data:', {
+          groundPoints: data.classification.ground.length,
+          total: pointcloud.numPoints
+        });
+
+        // Set up custom classification coloring
+        const classificationColors = new Float32Array(256 * 3);
+        // Set default color (gray) for all classes
+        for (let i = 0; i < 256; i++) {
+          classificationColors[i * 3] = 0.6;  // R
+          classificationColors[i * 3 + 1] = 0.6;  // G
+          classificationColors[i * 3 + 2] = 0.6;  // B
+        }
+        
+        // Set ground points color (red)
+        classificationColors[0] = 1.0;  // R
+        classificationColors[1] = 0.0;  // G
+        classificationColors[2] = 0.0;  // B
+
+        // Update material settings
+        pointcloud.material.pointColorType = window.Potree.PointColorType.CLASSIFICATION;
+        pointcloud.material.uniforms.classificationLUT.value = classificationColors;
+
+        // Apply classifications
+        console.log('Applying classifications to points...');
+        data.classification.ground.forEach((index: number) => {
+          pointcloud.setClassification(index, 0); // Set ground points to class 0
+        });
+
+        viewer.scene.dispatchEvent({
+          type: 'material_changed',
+          target: pointcloud
+        });
+
+        setIsGroundSegmentationActive(true);
+        console.log('Ground segmentation activated successfully');
+
+      } catch (error) {
+        console.error('Error applying ground segmentation:', error);
+        onError?.(error instanceof Error ? error.message : 'Failed to apply ground segmentation');
+      } finally {
+        setIsApplyingSegmentation(false);
+      }
+    }
   };
 
   return (
