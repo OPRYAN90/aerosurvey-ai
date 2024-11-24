@@ -4,7 +4,30 @@ import { spawn } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
+
+function truncateErrorMessage(error: string): string {
+  const maxLength = 1000;
+  if (error.length <= maxLength) return error;
+  return error.substring(0, maxLength) + `... (truncated, full length: ${error.length})`;
+}
+
+async function uploadToCloudStorage(projectId: string, data: any, type: string) {
+  const bucket = adminStorage.bucket();
+  const fileName = `ground-segmentation/${projectId}/${type}.json`;
+  const file = bucket.file(fileName);
+  
+  await file.save(JSON.stringify(data), {
+    contentType: 'application/json',
+    metadata: {
+      projectId,
+      type,
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  return fileName;
+}
 
 async function updateSegmentationProgress(
   projectId: string,
@@ -26,7 +49,6 @@ export async function POST(request: Request) {
   let tempDir: string | undefined;
 
   try {
-    // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ 
@@ -44,7 +66,7 @@ export async function POST(request: Request) {
 
     console.log('Starting ground segmentation for project:', {
       projectId,
-      fileUrl: fileUrl?.substring(0, 50) + '...' // Log truncated URL for privacy
+      fileUrl: fileUrl?.substring(0, 50) + '...'
     });
 
     if (!fileUrl || !projectId) {
@@ -54,11 +76,9 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Create temp directory
     tempDir = path.join(os.tmpdir(), `segmentation-${projectId}`);
     await fs.mkdir(tempDir, { recursive: true });
     
-    // Download file
     console.log('Downloading file to:', tempDir);
     const inputPath = path.join(tempDir, 'input.laz');
     const response = await fetch(fileUrl);
@@ -71,13 +91,10 @@ export async function POST(request: Request) {
     await fs.writeFile(inputPath, buffer);
     console.log('File downloaded successfully');
 
-    // Update initial status
     await updateSegmentationProgress(projectId, 0, 'processing');
 
-    // Run Python script
     const scriptPath = path.join(process.cwd(), 'scripts', 'ground_segmentation.py');
     
-    // Check if script exists
     try {
       await fs.access(scriptPath);
     } catch (error) {
@@ -93,65 +110,70 @@ export async function POST(request: Request) {
       let errorData = '';
 
       pythonProcess.stdout.on('data', (data) => {
-        outputData += data.toString();
-        console.log('Python script output:', data.toString());
+        const chunk = data.toString();
+        outputData += chunk;
       });
 
       pythonProcess.stderr.on('data', (data) => {
-        errorData += data.toString();
-        console.error('Python script error:', data.toString());
+        const chunk = data.toString();
+        console.error('Python script error:', chunk);
+        errorData += chunk;
       });
 
       pythonProcess.on('error', (error) => {
         console.error('Failed to start Python process:', error);
-        reject(error);
+        reject(new Error(`Failed to start Python process: ${error.message}`));
       });
 
       pythonProcess.on('close', (code) => {
         console.log('Python process exited with code:', code);
         if (code === 0) {
           try {
-            const result = JSON.parse(outputData);
+            const trimmedOutput = outputData.trim();
+            console.log('Parsing Python output length:', trimmedOutput.length);
+            const result = JSON.parse(trimmedOutput);
+            
+            if (!result.metadata || !result.classification) {
+              throw new Error('Invalid output structure from Python script');
+            }
+            
             resolve(result);
           } catch (e) {
             console.error('Failed to parse Python script output:', e);
-            reject(new Error(`Invalid output from Python script: ${outputData}`));
+            reject(new Error('Invalid output format from Python script'));
           }
         } else {
-          reject(new Error(`Python script failed with code ${code}: ${errorData}`));
+          const errorMsg = errorData.trim() || 'Unknown error';
+          reject(new Error(`Process failed with code ${code}: ${errorMsg}`));
         }
       });
     });
 
-    console.log('Ground segmentation completed successfully');
+    console.log('Ground segmentation completed, uploading results...');
 
-    // Store results in Firestore
+    // Upload classification data to Cloud Storage
+    const classificationPath = await uploadToCloudStorage(projectId, {
+      ground: result.classification.ground,
+      nonGround: result.classification.nonGround
+    }, 'classification');
+
+    // Store only metadata and file references in Firestore
     await adminDb.collection('projects').doc(projectId).update({
       groundSegmentation: {
         metadata: result.metadata,
-        hasClassification: true
+        hasClassification: true,
+        classificationFile: classificationPath,
+        updatedAt: new Date().toISOString()
       }
     });
 
-    // Store classification data in chunks
-    const chunkSize = 10000;
-    const { ground, nonGround } = result.classification;
-
-    for (let i = 0; i < ground.length; i += chunkSize) {
-      await adminDb
-        .collection('projects')
-        .doc(projectId)
-        .collection('groundClassification')
-        .doc(`chunk_${i}`)
-        .set({
-          ground: ground.slice(i, i + chunkSize),
-          nonGround: nonGround.slice(i, i + chunkSize)
-        });
-    }
-
     await updateSegmentationProgress(projectId, 100, 'completed');
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      metadata: result.metadata,
+      classificationFile: classificationPath
+    });
 
   } catch (error) {
     console.error('Ground segmentation error:', error);
@@ -159,14 +181,15 @@ export async function POST(request: Request) {
     if (projectId) {
       await updateSegmentationProgress(projectId, 0, 'error');
       await adminDb.collection('projects').doc(projectId).update({
-        groundSegmentationError: error instanceof Error ? error.message : 'Unknown error'
+        groundSegmentationError: error instanceof Error 
+          ? truncateErrorMessage(error.message)
+          : 'Unknown error'
       });
     }
 
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      details: error instanceof Error ? error.stack : undefined
+      error: error instanceof Error ? truncateErrorMessage(error.message) : 'Unknown error'
     }, { status: 500 });
 
   } finally {

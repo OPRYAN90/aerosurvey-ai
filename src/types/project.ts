@@ -36,6 +36,8 @@ export interface Project {
       success: boolean;
     };
     hasClassification: boolean;
+    classificationFile?: string;
+    updatedAt?: string;
   };
 }
 
