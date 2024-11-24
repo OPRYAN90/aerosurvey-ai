@@ -15,7 +15,25 @@ export class ConversionService {
     });
 
     try {
-      // Analyze coverage area first
+      // Start ground segmentation first
+      const segmentationResponse = await fetch('/api/ground-segmentation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          fileUrl: project.fileUrl,
+          projectId: project.id
+        })
+      });
+
+      if (!segmentationResponse.ok) {
+        const error = await segmentationResponse.json();
+        throw new Error(error.message || 'Ground segmentation failed');
+      }
+
+      // Analyze coverage area
       if (project.fileUrl) {
         const coverage = await CoverageAnalysisService.analyzeLazFile(project.fileUrl);
         

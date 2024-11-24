@@ -25,6 +25,18 @@ export interface Project {
       latitude: number;
     };
   };
+  groundSegmentationStatus?: 'pending' | 'processing' | 'completed' | 'error';
+  groundSegmentationProgress?: number;
+  groundSegmentationError?: string;
+  groundSegmentation?: {
+    metadata: {
+      totalPoints: number;
+      groundPoints: number;
+      nonGroundPoints: number;
+      success: boolean;
+    };
+    hasClassification: boolean;
+  };
 }
 
 export interface PointCloudData {
