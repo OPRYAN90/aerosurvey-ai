@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Project } from '@/types/project';
+import { getAuth } from 'firebase/auth';
 
 interface PotreeViewerProps {
   project: Project;
@@ -199,7 +200,11 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
                   // Fetch ground classification data
                   console.log('Fetching classification data for project:', project.id);
-                  const response = await fetch(`/api/projects/${project.id}/ground-classification`);
+                  const response = await fetch(`/api/projects/${project.id}/ground-classification`, {
+                    headers: {
+                      'Authorization': `Bearer ${await getAuthToken()}`
+                    }
+                  });
                   const data = await response.json();
                   
                   if (!data.classification) {
@@ -244,7 +249,12 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
                 } catch (error) {
                   console.error('Error applying ground segmentation:', error);
-                  onError?.(error instanceof Error ? error.message : 'Failed to apply ground segmentation');
+                  if (error instanceof Error && error.message === 'User not authenticated') {
+                    onError?.('Please sign in to use this feature');
+                  } else {
+                    onError?.(error instanceof Error ? error.message : 'Failed to apply ground segmentation');
+                  }
+                  setIsGroundSegmentationActive(false);
                 } finally {
                   setIsApplyingSegmentation(false);
                 }
@@ -356,6 +366,15 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
     element.click(callback);
     return element;
+  };
+
+  const getAuthToken = async () => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    return user.getIdToken();
   };
 
   return (

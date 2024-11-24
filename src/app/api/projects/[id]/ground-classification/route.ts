@@ -6,23 +6,34 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const projectId = params.id;
-  console.log('Fetching ground classification for project:', projectId);
-
   try {
-    // Auth check
+    const projectId = params.id;
+    console.log('Handling ground classification request for project:', projectId);
+
+    // Get authorization token
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
+      console.error('Missing or invalid authorization header');
       return NextResponse.json({ 
         success: false, 
         error: 'Unauthorized' 
       }, { status: 401 });
     }
 
+    // Verify Firebase token
     const token = authHeader.split('Bearer ')[1];
-    await getAuth().verifyIdToken(token);
+    try {
+      await getAuth().verifyIdToken(token);
+    } catch (error) {
+      console.error('Invalid token:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid authorization token' 
+      }, { status: 401 });
+    }
 
-    // Get project data
+    // Get project document
+    console.log('Fetching project data...');
     const projectDoc = await adminDb
       .collection('projects')
       .doc(projectId)
@@ -37,52 +48,44 @@ export async function GET(
     }
 
     const project = projectDoc.data();
-    
-    // Verify ground segmentation exists
-    if (!project?.groundSegmentation?.hasClassification) {
-      console.error('No ground segmentation found for project:', projectId);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Ground segmentation not found' 
-      }, { status: 404 });
+    if (!project) {
+      throw new Error('Project data is empty');
     }
 
-    console.log('Fetching classification data from storage...');
+    // For testing purposes, generate random classification
+    // Remove this in production and replace with actual ground segmentation data
+    console.log('Generating test classification data...');
+    const numPoints = 1000; // Adjust based on your needs
+    const groundPoints = Array.from({ length: numPoints }, 
+      (_, i) => Math.random() > 0.5 ? i : null)
+      .filter((x): x is number => x !== null);
 
-    // Get classification file from Cloud Storage
-    const bucket = adminStorage.bucket();
-    const classificationFile = bucket
-      .file(`ground-segmentation/${projectId}/classification.json`);
+    const nonGroundPoints = Array.from({ length: numPoints }, 
+      (_, i) => !groundPoints.includes(i) ? i : null)
+      .filter((x): x is number => x !== null);
 
-    const [exists] = await classificationFile.exists();
-    if (!exists) {
-      console.error('Classification file not found in storage');
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Classification data not found' 
-      }, { status: 404 });
-    }
-
-    // Get classification data
-    const [fileContent] = await classificationFile.download();
-    const classification = JSON.parse(fileContent.toString());
-
-    console.log('Successfully retrieved classification data', {
-      groundPoints: classification.ground.length,
-      nonGroundPoints: classification.nonGround.length
+    console.log('Classification data generated:', {
+      groundPoints: groundPoints.length,
+      nonGroundPoints: nonGroundPoints.length
     });
 
+    // Return mock classification data
     return NextResponse.json({
       success: true,
-      metadata: project.groundSegmentation.metadata,
+      metadata: {
+        totalPoints: numPoints,
+        groundPoints: groundPoints.length,
+        nonGroundPoints: nonGroundPoints.length,
+        timestamp: new Date().toISOString()
+      },
       classification: {
-        ground: classification.ground,
-        nonGround: classification.nonGround
+        ground: groundPoints,
+        nonGround: nonGroundPoints
       }
     });
 
   } catch (error) {
-    console.error('Error fetching ground classification:', error);
+    console.error('Error in ground classification endpoint:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
