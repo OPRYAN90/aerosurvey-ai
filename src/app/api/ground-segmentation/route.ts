@@ -29,17 +29,29 @@ export async function POST(request: Request) {
     // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      throw new Error('Invalid authorization header');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid authorization header' 
+      }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
     await getAuth().verifyIdToken(token);
 
-    const { fileUrl, projectId: id } = await request.json();
+    const body = await request.json();
+    const { fileUrl, projectId: id } = body;
     projectId = id;
 
+    console.log('Starting ground segmentation for project:', {
+      projectId,
+      fileUrl: fileUrl?.substring(0, 50) + '...' // Log truncated URL for privacy
+    });
+
     if (!fileUrl || !projectId) {
-      throw new Error('Missing required fields');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Missing required fields: fileUrl or projectId' 
+      }, { status: 400 });
     }
 
     // Create temp directory
@@ -47,14 +59,17 @@ export async function POST(request: Request) {
     await fs.mkdir(tempDir, { recursive: true });
     
     // Download file
+    console.log('Downloading file to:', tempDir);
     const inputPath = path.join(tempDir, 'input.laz');
     const response = await fetch(fileUrl);
+    
     if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.statusText}`);
+      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
     await fs.writeFile(inputPath, buffer);
+    console.log('File downloaded successfully');
 
     // Update initial status
     await updateSegmentationProgress(projectId, 0, 'processing');
@@ -62,34 +77,53 @@ export async function POST(request: Request) {
     // Run Python script
     const scriptPath = path.join(process.cwd(), 'scripts', 'ground_segmentation.py');
     
+    // Check if script exists
+    try {
+      await fs.access(scriptPath);
+    } catch (error) {
+      console.error('Python script not found at:', scriptPath);
+      throw new Error('Ground segmentation script not found');
+    }
+
+    console.log('Running ground segmentation script:', scriptPath);
+    
     const result = await new Promise<any>((resolve, reject) => {
-      const process = spawn('python', [scriptPath, inputPath]);
+      const pythonProcess = spawn('python', [scriptPath, inputPath]);
       let outputData = '';
       let errorData = '';
 
-      process.stdout.on('data', (data) => {
+      pythonProcess.stdout.on('data', (data) => {
         outputData += data.toString();
+        console.log('Python script output:', data.toString());
       });
 
-      process.stderr.on('data', (data) => {
+      pythonProcess.stderr.on('data', (data) => {
         errorData += data.toString();
+        console.error('Python script error:', data.toString());
       });
 
-      process.on('error', reject);
+      pythonProcess.on('error', (error) => {
+        console.error('Failed to start Python process:', error);
+        reject(error);
+      });
 
-      process.on('close', (code) => {
+      pythonProcess.on('close', (code) => {
+        console.log('Python process exited with code:', code);
         if (code === 0) {
           try {
             const result = JSON.parse(outputData);
             resolve(result);
           } catch (e) {
-            reject(new Error(`Invalid output: ${outputData}`));
+            console.error('Failed to parse Python script output:', e);
+            reject(new Error(`Invalid output from Python script: ${outputData}`));
           }
         } else {
-          reject(new Error(`Script failed: ${errorData}`));
+          reject(new Error(`Python script failed with code ${code}: ${errorData}`));
         }
       });
     });
+
+    console.log('Ground segmentation completed successfully');
 
     // Store results in Firestore
     await adminDb.collection('projects').doc(projectId).update({
@@ -120,7 +154,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error('Segmentation error:', error);
+    console.error('Ground segmentation error:', error);
     
     if (projectId) {
       await updateSegmentationProgress(projectId, 0, 'error');
@@ -131,7 +165,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
 
   } finally {

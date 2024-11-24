@@ -16,6 +16,7 @@ export class ConversionService {
 
     try {
       // Start ground segmentation first
+      console.log('Starting ground segmentation...');
       const segmentationResponse = await fetch('/api/ground-segmentation', {
         method: 'POST',
         headers: {
@@ -28,21 +29,33 @@ export class ConversionService {
         })
       });
 
+      const segmentationData = await segmentationResponse.json();
+
       if (!segmentationResponse.ok) {
-        const error = await segmentationResponse.json();
-        throw new Error(error.message || 'Ground segmentation failed');
+        console.error('Ground segmentation failed:', {
+          status: segmentationResponse.status,
+          statusText: segmentationResponse.statusText,
+          error: segmentationData.error,
+          details: segmentationData.details
+        });
+        throw new Error(segmentationData.error || 'Ground segmentation failed');
       }
+
+      console.log('Ground segmentation completed successfully');
 
       // Analyze coverage area
       if (project.fileUrl) {
+        console.log('Analyzing coverage area...');
         const coverage = await CoverageAnalysisService.analyzeLazFile(project.fileUrl);
         
         // Update project with coverage information
         await updateDoc(doc(db, 'projects', project.id!), {
           coverageArea: coverage
         });
+        console.log('Coverage area analysis completed');
       }
 
+      console.log('Starting file conversion...');
       const response = await fetch('/api/convert', {
         method: 'POST',
         headers: {
