@@ -9,6 +9,8 @@ declare module '@pnext/three-loader' {
         lookAt: (target: THREE.Vector3) => void;
       };
       addMeasurement: () => any;
+      pointclouds: any[];
+      dispatchEvent: (event: any) => void;
     };
     dispose: () => void;
     setDimensions: (width: number, height: number) => void;
@@ -16,6 +18,8 @@ declare module '@pnext/three-loader' {
     setEDLRadius: (radius: number) => void;
     setEDLStrength: (strength: number) => void;
     loadPointCloud: (url: string, name: string, callback: (e: any) => void) => void;
+    loadGUI: (callback: () => void) => void;
+    setLanguage: (lang: string) => void;
   }
 
   export interface ViewerOptions {
@@ -44,5 +48,22 @@ declare module '@pnext/three-loader' {
     pointSizeType: PointSizeType;
     shape: PointShape;
     classification: Record<number, { color: number[], name: string }>;
+    pointColorType: number;
+    activeAttributeName: string;
+    classifications: Record<number, any>;
+  }
+}
+
+declare global {
+  interface Window {
+    Potree: {
+      Viewer: any;
+      PointCloudMaterial: any;
+      Classification: any;
+      PointColorType: {
+        CLASSIFICATION: number;
+      };
+    };
+    THREE: any;
   }
 } 
