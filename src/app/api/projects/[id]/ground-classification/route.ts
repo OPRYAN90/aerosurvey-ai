@@ -4,43 +4,42 @@ import { adminDb, adminStorage } from '@/lib/firebase-admin';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } }  // Changed from projectId to id to match folder name
 ) {
-  try {
-    const projectId = params.id;
-    console.log('Handling ground classification request for project:', projectId);
+  const projectId = params.id;  // Get ID from params.id instead of params.projectId
+  console.log('🔍 API: Starting request for project:', projectId);
 
-    // Get authorization token
+  try {
+    if (!projectId) {
+      console.log('❌ API: Missing project ID');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Project ID is required' 
+      }, { status: 400 });
+    }
+
+    // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      console.error('Missing or invalid authorization header');
+      console.log('❌ API: Missing auth header');
       return NextResponse.json({ 
         success: false, 
         error: 'Unauthorized' 
       }, { status: 401 });
     }
 
-    // Verify Firebase token
     const token = authHeader.split('Bearer ')[1];
-    try {
-      await getAuth().verifyIdToken(token);
-    } catch (error) {
-      console.error('Invalid token:', error);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid authorization token' 
-      }, { status: 401 });
-    }
+    await getAuth().verifyIdToken(token);
+    console.log('✅ API: Auth verified');
 
-    // Get project document
-    console.log('Fetching project data...');
-    const projectDoc = await adminDb
-      .collection('projects')
-      .doc(projectId)
-      .get();
+    // Get project data with explicit path
+    const projectRef = adminDb.collection('projects').doc(projectId);
+    console.log('📄 API: Accessing document at path:', projectRef.path);
+    
+    const projectDoc = await projectRef.get();
 
     if (!projectDoc.exists) {
-      console.error('Project not found:', projectId);
+      console.log('❌ API: Project not found:', projectId);
       return NextResponse.json({ 
         success: false, 
         error: 'Project not found' 
@@ -48,44 +47,49 @@ export async function GET(
     }
 
     const project = projectDoc.data();
-    if (!project) {
-      throw new Error('Project data is empty');
-    }
-
-    // For testing purposes, generate random classification
-    // Remove this in production and replace with actual ground segmentation data
-    console.log('Generating test classification data...');
-    const numPoints = 1000; // Adjust based on your needs
-    const groundPoints = Array.from({ length: numPoints }, 
-      (_, i) => Math.random() > 0.5 ? i : null)
-      .filter((x): x is number => x !== null);
-
-    const nonGroundPoints = Array.from({ length: numPoints }, 
-      (_, i) => !groundPoints.includes(i) ? i : null)
-      .filter((x): x is number => x !== null);
-
-    console.log('Classification data generated:', {
-      groundPoints: groundPoints.length,
-      nonGroundPoints: nonGroundPoints.length
+    console.log('📄 API: Project data:', {
+      id: projectId,
+      hasGroundSegmentation: !!project?.groundSegmentation,
+      classificationPath: project?.groundSegmentation?.classificationFile
     });
 
-    // Return mock classification data
+    if (!project?.groundSegmentation?.classificationFile) {
+      console.log('❌ API: No ground segmentation data found');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Ground segmentation not processed' 
+      }, { status: 404 });
+    }
+
+    // Get classification data from storage
+    const bucket = adminStorage.bucket();
+    const file = bucket.file(project.groundSegmentation.classificationFile);
+    
+    const [exists] = await file.exists();
+    if (!exists) {
+      console.log('❌ API: Classification file not found in storage');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Classification data not found' 
+      }, { status: 404 });
+    }
+
+    const [content] = await file.download();
+    const classification = JSON.parse(content.toString());
+
+    console.log('✅ API: Retrieved classification data:', {
+      groundPoints: classification.ground?.length || 0,
+      nonGroundPoints: classification.nonGround?.length || 0
+    });
+
     return NextResponse.json({
       success: true,
-      metadata: {
-        totalPoints: numPoints,
-        groundPoints: groundPoints.length,
-        nonGroundPoints: nonGroundPoints.length,
-        timestamp: new Date().toISOString()
-      },
-      classification: {
-        ground: groundPoints,
-        nonGround: nonGroundPoints
-      }
+      metadata: project.groundSegmentation.metadata,
+      classification
     });
 
   } catch (error) {
-    console.error('Error in ground classification endpoint:', error);
+    console.error('❌ API Error:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
