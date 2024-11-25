@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Project } from '@/types/project';
 import { getAuth } from 'firebase/auth';
 
+declare const THREE: any;
+
 interface PotreeViewerProps {
   project: Project;
   onError?: (error: string) => void;
@@ -340,103 +342,161 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     return data;
   };
 
-  const applyGroundSegmentation = (pointcloud: any, groundIndices: number[]) => {
-    if (!pointcloud?.numPoints) {
-      console.error('❌ Invalid point cloud:', pointcloud);
-      throw new Error('Point cloud not properly loaded');
+  const applyGroundSegmentation = (pointcloud: any, classification: { ground: number[], nonGround: number[] }) => {
+    console.log('🔍 Starting ground segmentation with:', {
+      totalGroundPoints: classification.ground.length,
+      totalNonGroundPoints: classification.nonGround.length
+    });
+
+    // Get the proper Potree namespace
+    const Potree = (window as any).Potree;
+    if (!Potree) {
+      throw new Error('Potree not initialized');
     }
 
-    console.log('🎨 Applying ground segmentation to', groundIndices.length, 'points');
+    // 1. First, ensure we have the correct point count
+    const totalPoints = classification.ground.length + classification.nonGround.length;
+    console.log('📊 Setting up classification for', totalPoints, 'points');
 
-    // Set up classification colors
-    const classificationColors = new Float32Array(256 * 3);
-    // Default color (gray)
-    for (let i = 0; i < 256; i++) {
-      classificationColors[i * 3] = 0.8;     // R
-      classificationColors[i * 3 + 1] = 0.8; // G
-      classificationColors[i * 3 + 2] = 0.8; // B
-    }
+    // 2. Set up color values (using Potree's internal format)
+    const colors = {
+      nonGround: { r: 0.8, g: 0.8, b: 0.8 }, // Gray
+      ground: { r: 1.0, g: 0.0, b: 0.0 }     // Red
+    };
+
+    // 3. Create RGB attributes for each point
+    const rgbArray = new Float32Array(totalPoints * 3);
     
-    // Ground points color (red)
-    classificationColors[2 * 3] = 1.0;     // R
-    classificationColors[2 * 3 + 1] = 0.0; // G
-    classificationColors[2 * 3 + 2] = 0.0; // B
+    // Fill with default color (non-ground)
+    for (let i = 0; i < totalPoints; i++) {
+      rgbArray[i * 3] = colors.nonGround.r;
+      rgbArray[i * 3 + 1] = colors.nonGround.g;
+      rgbArray[i * 3 + 2] = colors.nonGround.b;
+    }
 
-    // Create classification array
-    const classification = new Uint8Array(pointcloud.numPoints).fill(1);
-    groundIndices.forEach(index => {
-      if (index < classification.length) {
-        classification[index] = 2;  // Class 2 for ground points
+    // Set ground point colors
+    console.log('🎨 Applying ground point colors...');
+    let appliedColors = 0;
+    classification.ground.forEach(index => {
+      if (index < totalPoints) {
+        rgbArray[index * 3] = colors.ground.r;
+        rgbArray[index * 3 + 1] = colors.ground.g;
+        rgbArray[index * 3 + 2] = colors.ground.b;
+        appliedColors++;
       }
     });
+    
+    console.log(`✅ Applied colors to ${appliedColors} ground points`);
 
-    // Apply to point cloud
-    pointcloud.material.pointColorType = window.Potree.PointColorType.CLASSIFICATION;
-    pointcloud.material.uniforms.classificationLUT.value = classificationColors;
-    pointcloud.setClassifications(classification);
+    try {
+      // Method 1: Try using Potree's built-in color attribute
+      if (pointcloud.geometry && pointcloud.geometry.attributes) {
+        console.log('📊 Using geometry attributes method');
+        pointcloud.geometry.attributes.color = new THREE.BufferAttribute(rgbArray, 3);
+        pointcloud.geometry.attributes.color.needsUpdate = true;
+      }
+      // Method 2: Try using Potree's material system
+      else if (pointcloud.material) {
+        console.log('📊 Using material method');
+        pointcloud.material.vertexColors = true;
+        pointcloud.material.color = new THREE.Color(1, 1, 1);
+        
+        // Set custom vertex colors
+        if (pointcloud.pcoGeometry && pointcloud.pcoGeometry.vertices) {
+          console.log('📊 Setting vertex colors');
+          pointcloud.pcoGeometry.vertices.forEach((vertex: any, i: number) => {
+            vertex.color = new THREE.Color(
+              rgbArray[i * 3],
+              rgbArray[i * 3 + 1],
+              rgbArray[i * 3 + 2]
+            );
+          });
+        }
+      }
 
-    // Update material
-    pointcloud.material.needsUpdate = true;
+      // Update material
+      pointcloud.material.needsUpdate = true;
 
-    // Force scene update
-    viewerRef.current?.scene.dispatchEvent({
-      type: 'material_changed',
-      target: pointcloud
-    });
+      // Force viewer update
+      console.log('🔄 Triggering scene update');
+      viewerRef.current?.scene.dispatchEvent({
+        type: 'material_changed',
+        target: pointcloud
+      });
 
-    console.log('✅ Ground segmentation applied successfully');
+      console.log('✅ Color application complete');
+
+    } catch (error) {
+      console.error('❌ Error applying colors:', error);
+      throw new Error('Failed to apply colors: ' + (error as Error).message);
+    }
   };
 
   const resetVisualization = (pointcloud: any) => {
-    if (!pointcloud) return;
+    console.log('🔄 Resetting visualization');
+    
+    try {
+      if (pointcloud.geometry?.attributes?.color) {
+        // Reset to default color
+        const defaultColor = new Float32Array(pointcloud.geometry.attributes.color.count * 3).fill(1);
+        pointcloud.geometry.attributes.color.array = defaultColor;
+        pointcloud.geometry.attributes.color.needsUpdate = true;
+      }
+      
+      if (pointcloud.material) {
+        pointcloud.material.vertexColors = false;
+        pointcloud.material.color = new THREE.Color(1, 1, 1);
+        pointcloud.material.needsUpdate = true;
+      }
 
-    // Reset to RGB coloring
-    pointcloud.material.pointColorType = window.Potree.PointColorType.RGB;
-    pointcloud.material.uniforms.classificationLUT.value = new Float32Array(256 * 3);
-    pointcloud.material.needsUpdate = true;
+      // Update scene
+      viewerRef.current?.scene.dispatchEvent({
+        type: 'material_changed',
+        target: pointcloud
+      });
 
-    viewerRef.current?.scene.dispatchEvent({
-      type: 'material_changed',
-      target: pointcloud
-    });
+      console.log('✅ Reset complete');
+    } catch (error) {
+      console.error('❌ Reset error:', error);
+      throw new Error('Failed to reset visualization: ' + (error as Error).message);
+    }
   };
 
   const toggleGroundSegmentation = async () => {
-    console.log('🔄 Viewer: Toggling ground segmentation');
+    console.log('🔄 Starting ground segmentation toggle');
     
     try {
       setIsApplyingSegmentation(true);
       
       const viewer = viewerRef.current;
       if (!viewer?.scene?.pointclouds?.length) {
-        console.log('❌ Viewer: No point cloud found in scene');
         throw new Error('No point cloud loaded');
       }
 
       const pointcloud = viewer.scene.pointclouds[0];
-      console.log('📊 Viewer: Found point cloud:', {
-        name: pointcloud.name,
-        numPoints: pointcloud.numPoints
+      console.log('📊 Point cloud state:', {
+        pcoGeometry: !!pointcloud.pcoGeometry,
+        numPoints: pointcloud.pcoGeometry?.numPoints,
+        material: !!pointcloud.material
       });
 
       if (isGroundSegmentationActive) {
-        console.log('🔄 Viewer: Deactivating ground segmentation');
+        console.log('🔄 Deactivating ground segmentation');
         resetVisualization(pointcloud);
         setIsGroundSegmentationActive(false);
       } else {
-        console.log('🔄 Viewer: Activating ground segmentation');
+        console.log('🔄 Activating ground segmentation');
         const data = await fetchGroundSegmentationData();
         
         if (!data.success || !data.classification?.ground) {
-          console.log('❌ Viewer: Invalid data received:', data);
           throw new Error('Invalid segmentation data');
         }
 
-        await applyGroundSegmentation(pointcloud, data.classification.ground);
+        await applyGroundSegmentation(pointcloud, data.classification);
         setIsGroundSegmentationActive(true);
       }
     } catch (error) {
-      console.error('❌ Viewer: Ground segmentation error:', error);
+      console.error('Ground segmentation error:', error);
       onError?.(error instanceof Error ? error.message : 'Failed to toggle ground segmentation');
     } finally {
       setIsApplyingSegmentation(false);
