@@ -193,15 +193,70 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
             if (viewer.scene.pointclouds.length > 0) {
               const cloud = viewer.scene.pointclouds[0];
               
-              cloud.visibleNodes.forEach(node => {
+              cloud.visibleNodes.forEach((node: any) => {
                 if (node.geometryNode?.geometry?.attributes) {
-                  console.log('📍 Node Data Available:', {
+                  const geometry = node.geometryNode.geometry;
+                  
+                  // Add detailed point transformation testing
+                  const testPoints = Array.from(
+                    { length: Math.min(5, geometry.attributes.position.count) },
+                    (_, i) => {
+                      try {
+                        // 1. Extract raw point from buffer
+                        const rawPoint = new THREE.Vector3(
+                          geometry.attributes.position.array[i * 3],
+                          geometry.attributes.position.array[i * 3 + 1],
+                          geometry.attributes.position.array[i * 3 + 2]
+                        );
+
+                        // 2. Apply matrixWorld to get world position
+                        const worldPoint = rawPoint.clone().applyMatrix4(node.sceneNode.matrixWorld);
+
+                        // 3. Calculate expected position using node's translation
+                        const expectedPosition = {
+                          x: rawPoint.x + node.sceneNode.matrixWorld.elements[12],
+                          y: rawPoint.y + node.sceneNode.matrixWorld.elements[13],
+                          z: rawPoint.z + node.sceneNode.matrixWorld.elements[14]
+                        };
+
+                        // 4. Return comprehensive point data
+                        return {
+                          raw: { x: rawPoint.x, y: rawPoint.y, z: rawPoint.z },
+                          world: worldPoint.toArray(),
+                          expected: [expectedPosition.x, expectedPosition.y, expectedPosition.z],
+                          error: {
+                            x: Math.abs(worldPoint.x - expectedPosition.x),
+                            y: Math.abs(worldPoint.y - expectedPosition.y),
+                            z: Math.abs(worldPoint.z - expectedPosition.z)
+                          },
+                          matrixWorld: Array.from(node.sceneNode.matrixWorld.elements)
+                        };
+                      } catch (error) {
+                        console.error('❌ Error processing test point:', {
+                          pointIndex: i,
+                          nodeName: node.name,
+                          error
+                        });
+                        return null;
+                      }
+                    }
+                  ).filter(Boolean); // Remove any null entries from failed point processing
+
+                  console.log('🎯 Point Check:', {
                     name: node.name,
-                    numPoints: node.geometryNode.geometry.attributes.position.count,
-                    hasClassification: !!node.geometryNode.geometry.attributes.classification,
-                    coordinates: Array.from(
-                      node.geometryNode.geometry.attributes.position.array.slice(0, 9)
-                    ).map(x => Number(x).toFixed(2))
+                    points: testPoints,
+                    metadata: {
+                      nodeTranslation: {
+                        x: node.sceneNode.matrixWorld.elements[12],
+                        y: node.sceneNode.matrixWorld.elements[13],
+                        z: node.sceneNode.matrixWorld.elements[14]
+                      }
+                    },
+                    maxError: Math.max(
+                      ...testPoints.flatMap(p =>
+                        p ? [p.error.x, p.error.y, p.error.z] : []
+                      )
+                    )
                   });
                 }
               });
@@ -536,127 +591,215 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   const applyGroundSegmentation = (pointcloud: any, classification: { ground: number[], nonGround: number[] }) => {
     console.log('🔍 Starting ground segmentation');
     
-    // Log root node details immediately
-    if (pointcloud.pcoGeometry?.root) {
-      logNodeDetails(pointcloud.pcoGeometry.root);
-    }
-    
-    // Log currently visible nodes
-    if (pointcloud.visibleNodes) {
-      pointcloud.visibleNodes.forEach((node: any) => {
-        logNodeDetails(node);
-      });
-    }
-
-    try {
-      // Add node loading monitor
-      const nodeLoadMonitor = (e: any) => {
-        const node = e.node;
-        console.log('📦 Node loaded:', {
-          name: node.name,
-          level: node.level,
-          numPoints: node.numPoints,
-          hasGeometry: !!node.geometryNode?.geometry,
-          attributes: node.geometryNode?.geometry?.attributes ? 
-            Object.keys(node.geometryNode.geometry.attributes) : []
-        });
-      };
-
-      // Add load listener
-      pointcloud.addEventListener('node_loaded', nodeLoadMonitor);
-
-      // Monitor octree state
-      console.log('🌳 Octree initial state:', {
-        maxLevel: pointcloud.maxLevel,
-        loadedNodes: pointcloud.loadedNodes?.size || 0,
-        loader: !!pointcloud.loader,
-        disposed: pointcloud.disposed,
-        initialized: pointcloud.initialized
+    // Add node loading monitor
+    const nodeLoadMonitor = (e: any) => {
+      const node = e.node;
+      console.log('📦 Node loaded:', {
+        name: node.name,
+        level: node.level,
+        numPoints: node.numPoints,
+        hasGeometry: !!node.geometryNode?.geometry,
+        attributes: node.geometryNode?.geometry?.attributes ? 
+          Object.keys(node.geometryNode.geometry.attributes) : []
       });
 
-      // Force node loading if needed
-      if (pointcloud.loadedNodes?.size === 0) {
-        console.log('⚡ Forcing node load');
-        if (pointcloud.loader) {
-          // Try to load root node
-          const rootNode = pointcloud.pcoGeometry.root;
-          if (rootNode) {
-            console.log('🌱 Loading root node:', {
-              name: rootNode.name,
-              level: rootNode.level,
-              spacing: rootNode.spacing
+      // Test coordinate matching on newly loaded nodes
+      testCoordinateMatching(node);
+    };
+
+    // Add coordinate matching test function
+    const testCoordinateMatching = (node: any) => {
+      // Always log the initial attempt
+      console.log('🔄 Starting coordinate test for node:', node.name);
+
+      try {
+        if (!node.geometryNode?.geometry?.attributes?.position) {
+          console.log('⚠️ No geometry data available for node:', {
+            nodeName: node.name,
+            hasGeometryNode: !!node.geometryNode,
+            hasGeometry: !!node.geometryNode?.geometry,
+            hasPosition: !!node.geometryNode?.geometry?.attributes?.position
+          });
+          return;
+        }
+
+        const geometry = node.geometryNode.geometry;
+        const positions = geometry.attributes.position;
+        
+        // Test first 5 points from node
+        for (let i = 0; i < Math.min(5, positions.count); i++) {
+          try {
+            const nodePoint = {
+              x: positions.array[i * 3] || 0,
+              y: positions.array[i * 3 + 1] || 0,
+              z: positions.array[i * 3 + 2] || 0
+            };
+
+            // Log raw point data first
+            console.log('📍 Raw point data:', {
+              index: i,
+              coordinates: nodePoint
             });
-            pointcloud.loader.load(rootNode);
+
+            let worldPoint;
+            try {
+              // Transform point to world coordinates
+              worldPoint = new THREE.Vector3(nodePoint.x, nodePoint.y, nodePoint.z)
+                .applyMatrix4(pointcloud.matrixWorld);
+              
+              console.log('🌍 World coordinates:', worldPoint.toArray());
+            } catch (error) {
+              console.error('❌ World transform error:', {
+                error,
+                nodePoint,
+                hasMatrix: !!pointcloud.matrixWorld
+              });
+              continue;
+            }
+
+            let original;
+            try {
+              // Transform back to original coordinates
+              original = {
+                x: worldPoint.x / (pointcloud.pcoGeometry.scale[0] || 1) + (pointcloud.pcoGeometry.offset[0] || 0),
+                y: worldPoint.y / (pointcloud.pcoGeometry.scale[1] || 1) + (pointcloud.pcoGeometry.offset[1] || 0),
+                z: worldPoint.z / (pointcloud.pcoGeometry.scale[2] || 1) + (pointcloud.pcoGeometry.offset[2] || 0)
+              };
+            } catch (error) {
+              console.error('❌ Reverse transform error:', {
+                error,
+                worldPoint: worldPoint.toArray(),
+                scale: pointcloud.pcoGeometry?.scale,
+                offset: pointcloud.pcoGeometry?.offset
+              });
+              continue;
+            }
+
+            // Final comprehensive log
+            console.log('🎯 Point Coordinate Test:', {
+              nodePoint,
+              worldPoint: worldPoint.toArray(),
+              transformedBack: original,
+              node: node.name,
+              pointIndex: i,
+              transformations: {
+                scale: pointcloud.pcoGeometry?.scale,
+                offset: pointcloud.pcoGeometry?.offset,
+                matrixWorld: pointcloud.matrixWorld?.elements
+              }
+            });
+          } catch (error) {
+            console.error('❌ Point processing error:', {
+              error,
+              pointIndex: i,
+              nodeName: node.name
+            });
           }
         }
+      } catch (error) {
+        console.error('❌ Overall coordinate test error:', {
+          error,
+          node: node.name,
+          pointcloudState: {
+            hasMatrix: !!pointcloud.matrixWorld,
+            hasGeometry: !!pointcloud.pcoGeometry,
+            scale: pointcloud.pcoGeometry?.scale,
+            offset: pointcloud.pcoGeometry?.offset
+          }
+        });
       }
+    };
 
-      // Monitor visible nodes
-      const checkVisibleNodes = () => {
-        const visibleNodes = pointcloud.octree?.visibleNodes || [];
-        console.log('👁️ Visible nodes:', {
-          count: visibleNodes.length,
-          loaded: visibleNodes.filter((n: any) => n.loaded).length,
-          withGeometry: visibleNodes.filter((n: any) => n.geometryNode?.geometry).length
+    // Add load listener
+    pointcloud.addEventListener('node_loaded', nodeLoadMonitor);
+
+    // Monitor octree state
+    console.log('🌳 Octree initial state:', {
+      maxLevel: pointcloud.maxLevel,
+      loadedNodes: pointcloud.loadedNodes?.size || 0,
+      loader: !!pointcloud.loader,
+      disposed: pointcloud.disposed,
+      initialized: pointcloud.initialized
+    });
+
+    // Force node loading if needed
+    if (pointcloud.loadedNodes?.size === 0) {
+      console.log('⚡ Forcing node load');
+      if (pointcloud.loader) {
+        // Try to load root node
+        const rootNode = pointcloud.pcoGeometry.root;
+        if (rootNode) {
+          console.log('🌱 Loading root node:', {
+            name: rootNode.name,
+            level: rootNode.level,
+            spacing: rootNode.spacing
+          });
+          pointcloud.loader.load(rootNode);
+        }
+      }
+    }
+
+    // Monitor visible nodes
+    const checkVisibleNodes = () => {
+      const visibleNodes = pointcloud.octree?.visibleNodes || [];
+      console.log('👁️ Visible nodes:', {
+        count: visibleNodes.length,
+        loaded: visibleNodes.filter((n: any) => n.loaded).length,
+        withGeometry: visibleNodes.filter((n: any) => n.geometryNode?.geometry).length
+      });
+
+      // If we have nodes with geometry, apply classification
+      if (visibleNodes.some((n: any) => n.geometryNode?.geometry)) {
+        visibleNodes.forEach((node: any) => {
+          if (node.geometryNode?.geometry?.attributes) {
+            console.log('📊 Node attributes:', {
+              node: node.name,
+              attributes: Object.keys(node.geometryNode.geometry.attributes)
+            });
+          }
         });
 
-        // If we have nodes with geometry, apply classification
-        if (visibleNodes.some((n: any) => n.geometryNode?.geometry)) {
-          visibleNodes.forEach((node: any) => {
-            if (node.geometryNode?.geometry?.attributes) {
-              console.log('📊 Node attributes:', {
-                node: node.name,
-                attributes: Object.keys(node.geometryNode.geometry.attributes)
-              });
-            }
-          });
-
-          // Apply classification to visible nodes
-          applyClassificationToNodes(pointcloud, visibleNodes, classification);
-        }
-      };
-
-      // Set up periodic check for nodes
-      const nodeCheckInterval = setInterval(checkVisibleNodes, 500);
-      setTimeout(() => clearInterval(nodeCheckInterval), 5000);
-
-      // Set up material
-      const material = pointcloud.material;
-      logMaterialState(material);
-      material.needsUpdate = true;
-
-      // Set up uniforms
-      const classificationLUT = new Float32Array(256 * 3);
-      for (let i = 0; i < 256; i++) {
-        classificationLUT[i * 3] = 0.8;     // Default gray
-        classificationLUT[i * 3 + 1] = 0.8;
-        classificationLUT[i * 3 + 2] = 0.8;
+        // Apply classification to visible nodes
+        applyClassificationToNodes(pointcloud, visibleNodes, classification);
       }
-      
-      // Ground points in red
-      classificationLUT[2 * 3] = 1.0;     // R
-      classificationLUT[2 * 3 + 1] = 0.0; // G
-      classificationLUT[2 * 3 + 2] = 0.0; // B
+    };
 
-      if (material.uniforms.classificationLUT) {
-        material.uniforms.classificationLUT.value = classificationLUT;
-      }
+    // Set up periodic check for nodes
+    const nodeCheckInterval = setInterval(checkVisibleNodes, 500);
+    setTimeout(() => clearInterval(nodeCheckInterval), 5000);
 
-      logMaterialState(material);
+    // Set up material
+    const material = pointcloud.material;
+    logMaterialState(material);
+    material.needsUpdate = true;
 
-      // Try to force point cloud update
-      pointcloud.requiresUpdate = true;
-      pointcloud.octree.needsUpdate = true;
-      
-      return () => {
-        pointcloud.removeEventListener('node_loaded', nodeLoadMonitor);
-        clearInterval(nodeCheckInterval);
-      };
-
-    } catch (error) {
-      console.error('❌ Error in ground segmentation:', error);
-      throw error;
+    // Set up uniforms
+    const classificationLUT = new Float32Array(256 * 3);
+    for (let i = 0; i < 256; i++) {
+      classificationLUT[i * 3] = 0.8;     // Default gray
+      classificationLUT[i * 3 + 1] = 0.8;
+      classificationLUT[i * 3 + 2] = 0.8;
     }
+    
+    // Ground points in red
+    classificationLUT[2 * 3] = 1.0;     // R
+    classificationLUT[2 * 3 + 1] = 0.0; // G
+    classificationLUT[2 * 3 + 2] = 0.0; // B
+
+    if (material.uniforms.classificationLUT) {
+      material.uniforms.classificationLUT.value = classificationLUT;
+    }
+
+    logMaterialState(material);
+
+    // Try to force point cloud update
+    pointcloud.requiresUpdate = true;
+    pointcloud.octree.needsUpdate = true;
+    
+    return () => {
+      pointcloud.removeEventListener('node_loaded', nodeLoadMonitor);
+      clearInterval(nodeCheckInterval);
+    };
   };
 
   const resetVisualization = (pointcloud: any) => {
@@ -1071,6 +1214,46 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
       };
 
       console.log('🔄 Transformation State:', state);
+
+      // Add test coordinates right here where we know we have the transformation data
+      const testPoints = [
+        { x: 597000.01, y: 3696000, z: -72.39 }, // Using the position we see in the console
+        { x: 597000.01 + 1, y: 3696000 + 1, z: -72.39 + 1 }, // Slightly offset point
+      ];
+
+      console.log('🎯 Testing coordinate transformations with known points:');
+      testPoints.forEach((point, index) => {
+        try {
+          // Forward transformation
+          const worldPoint = new THREE.Vector3(point.x, point.y, point.z)
+            .applyMatrix4(pointcloud.matrixWorld);
+
+          // Reverse transformation
+          const backToOriginal = {
+            x: worldPoint.x / (pointcloud.pcoGeometry.scale[0] || 1) + (pointcloud.pcoGeometry.offset[0] || 0),
+            y: worldPoint.y / (pointcloud.pcoGeometry.scale[1] || 1) + (pointcloud.pcoGeometry.offset[1] || 0),
+            z: worldPoint.z / (pointcloud.pcoGeometry.scale[2] || 1) + (pointcloud.pcoGeometry.offset[2] || 0)
+          };
+
+          console.log(`📍 Test Point ${index + 1}:`, {
+            original: point,
+            worldTransformed: worldPoint.toArray(),
+            backToOriginal,
+            transformationData: {
+              scale: pointcloud.pcoGeometry.scale,
+              offset: pointcloud.pcoGeometry.offset,
+              hasMatrix: !!pointcloud.matrixWorld
+            }
+          });
+        } catch (error) {
+          console.error(`❌ Error testing point ${index + 1}:`, {
+            point,
+            error,
+            transformState: state
+          });
+        }
+      });
+
       return state;
     } catch (error) {
       console.error('❌ Error getting transformation state:', {
