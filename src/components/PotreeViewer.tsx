@@ -293,69 +293,113 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         const publicUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
         
         window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
-          console.log('🚀 Point cloud load callback triggered:', {
-            hasPointCloud: !!e?.pointcloud,
-            pointCloudProps: e?.pointcloud ? Object.keys(e.pointcloud) : null,
-            hasRoot: !!e?.pointcloud?.root
+          console.log('🎯 LoadPointCloud callback triggered');
+          
+          const pointcloud = e.pointcloud;
+          
+          console.log('🎯 Pointcloud object:', {
+            exists: !!pointcloud,
+            pcoGeometry: !!pointcloud?.pcoGeometry,
+            root: !!pointcloud?.pcoGeometry?.root
           });
-
-          if (!e?.pointcloud) {
-            console.error('❌ No point cloud in load event:', e);
-            throw new Error('Invalid point cloud data received');
+          
+          // Add monitoring
+          monitorLoadedData(pointcloud);
+          
+          // Log root node details immediately
+          if (pointcloud.pcoGeometry?.root) {
+            console.log('🌱 Root node details:', {
+              name: pointcloud.pcoGeometry.root.name,
+              hasGeometry: !!pointcloud.pcoGeometry.root.geometry,
+              hasGeometryNode: !!pointcloud.pcoGeometry.root.geometryNode,
+              hasBuffer: !!pointcloud.pcoGeometry.root.geometryNode?.buffer,
+              attributes: pointcloud.pcoGeometry.root.geometryNode?.geometry?.attributes ? 
+                Object.keys(pointcloud.pcoGeometry.root.geometryNode.geometry.attributes) : 'no attributes'
+            });
           }
 
-          const pointcloud = e.pointcloud;
-          console.log('📊 Initial point cloud state:', {
-            name: pointcloud.name,
-            hasHierarchy: !!pointcloud.pcoGeometry,
-            hasRoot: !!pointcloud.pcoGeometry?.root,
-            initialized: pointcloud.initialized,
-            disposed: pointcloud.disposed
-          });
+          // Log currently visible nodes
+          if (pointcloud.visibleNodes) {
+            console.log('👁️ Initial visible nodes:', {
+              count: pointcloud.visibleNodes.length,
+              nodes: pointcloud.visibleNodes.map((node: any) => ({
+                name: node.name,
+                level: node.level,
+                hasGeometry: !!node.geometryNode?.geometry,
+                hasBuffer: !!node.geometryNode?.buffer
+              }))
+            });
+          }
 
-          // Add hierarchy load listener with debug
-          pointcloud.addEventListener('hierarchy_loaded', () => {
-            console.log('🌳 Hierarchy loaded event fired', {
-              hasRoot: !!pointcloud.root,
-              rootDetails: pointcloud.root ? {
-                name: pointcloud.root.name,
-                hasGeometry: !!pointcloud.root.geometry,
-                level: pointcloud.root.level
+          const monitorNodeBuffer = (node: any) => {
+            console.log('📊 Node Buffer Check:', {
+              nodeName: node.name,
+              hasBuffer: !!node.geometryNode?.buffer,
+              bufferDetails: node.geometryNode?.buffer ? {
+                numPoints: node.geometryNode.buffer.numElements,
+                attributes: Object.keys(node.geometryNode.buffer.attributes || {}),
+                position: {
+                  offset: node.geometryNode.buffer.attributes.position?.offset,
+                  stride: node.geometryNode.buffer.attributes.position?.stride
+                },
+                classification: {
+                  offset: node.geometryNode.buffer.attributes.classification?.offset,
+                  stride: node.geometryNode.buffer.attributes.classification?.stride
+                }
               } : null
             });
+          };
 
-            try {
-              logNodeDetails(pointcloud.root);
-            } catch (error) {
-              console.error('❌ Error logging root node details:', error);
-            }
+          console.log('🎯 About to add node_loaded listener');
+          
+          pointcloud.addEventListener('node_loaded', (e: any) => {
+            console.log('📦 Node loaded event fired:', {
+              hasNode: !!e.node,
+              nodeName: e.node?.name,
+              hasGeometryNode: !!e.node?.geometryNode,
+              hasBuffer: !!e.node?.geometryNode?.buffer
+            });
+
+            monitorNodeBuffer(e.node);
             
-            // Add node load listener with debug
-            pointcloud.addEventListener('node_loaded', (nodeEvent: any) => {
-              console.log('📦 Node loaded event fired:', {
-                hasNode: !!nodeEvent?.node,
-                nodeName: nodeEvent?.node?.name
-              });
-
+            if (e.node.geometryNode?.buffer) {
               try {
-                logNodeDetails(nodeEvent.node);
+                const buffer = e.node.geometryNode.buffer;
+                console.log('💾 Buffer details:', {
+                  hasData: !!buffer.data,
+                  dataByteLength: buffer.data?.byteLength,
+                  attributes: Object.keys(buffer.attributes || {})
+                });
+
+                const dataView = new DataView(buffer.data);
+                const positionOffset = buffer.attributes.position.offset;
+                const stride = buffer.stride;
+                
+                console.log('🔍 First Point Data:', {
+                  x: dataView.getFloat32(positionOffset, true),
+                  y: dataView.getFloat32(positionOffset + 4, true),
+                  z: dataView.getFloat32(positionOffset + 8, true),
+                  classification: buffer.attributes.classification ? 
+                    dataView.getUint8(buffer.attributes.classification.offset) : 'no classification'
+                });
               } catch (error) {
-                console.error('❌ Error logging loaded node details:', {
+                console.error('❌ Error reading buffer:', {
                   error,
-                  nodeEvent,
-                  node: nodeEvent?.node
+                  bufferState: {
+                    exists: !!e.node.geometryNode.buffer,
+                    hasData: !!e.node.geometryNode.buffer?.data,
+                    attributes: Object.keys(e.node.geometryNode.buffer?.attributes || {})
+                  }
                 });
               }
-            });
-          });
-
-          // Add error handling for hierarchy loading
-          pointcloud.addEventListener('hierarchy_load_error', (error: any) => {
-            console.error('❌ Hierarchy load error:', error);
+            }
           });
 
           viewer.scene.addPointCloud(pointcloud);
+          console.log('✅ Point cloud added to scene');
+          
           setTimeout(() => {
+            console.log('⏱️ Timeout callback - fitting to screen');
             viewer.fitToScreen();
             setIsLoading(false);
           }, 100);
@@ -846,6 +890,73 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
     }
   };
   
+  const logMaterialState = (material: any) => {
+    console.log('🎨 Material state:', {
+      vertexColors: material.vertexColors,
+      pointColorType: material.pointColorType,
+      uniforms: Object.keys(material.uniforms || {})
+    });
+  };
+
+  const monitorLoadedData = (pointcloud: any) => {
+    console.log('🔍 Setting up monitoring for pointcloud:', {
+      hasPointcloud: !!pointcloud,
+      type: pointcloud?.type,
+      hasEventListener: typeof pointcloud?.addEventListener === 'function'
+    });
+
+    try {
+      // Watch for octree events
+      pointcloud?.addEventListener?.('octree_initialized', (e: any) => {
+        console.log('🌳 Octree initialized:', {
+          maxPoints: pointcloud?.numPoints,
+          loadedNodes: pointcloud?.loadedNodes?.size,
+          event: e
+        });
+      });
+
+      console.log('✅ Added octree_initialized listener');
+
+      // Watch for actual data loading
+      pointcloud?.addEventListener?.('points_loaded', (e: any) => {
+        console.log('📦 Node data loaded:', {
+          hasNode: !!e?.node,
+          name: e?.node?.name,
+          buffer: e?.node?.geometryNode?.buffer ? {
+            size: e?.node?.geometryNode?.buffer?.data?.byteLength,
+            numElements: e?.node?.geometryNode?.buffer?.numElements,
+            stride: e?.node?.geometryNode?.buffer?.stride,
+            attributes: Object.keys(e?.node?.geometryNode?.buffer?.attributes || {})
+          } : 'no buffer',
+          rawEvent: e
+        });
+      });
+
+      console.log('✅ Added points_loaded listener');
+
+      // Immediate inspection of pointcloud state
+      console.log('📊 Current pointcloud state:', {
+        numPoints: pointcloud?.numPoints,
+        loadedNodes: pointcloud?.loadedNodes?.size,
+        octreeInitialized: pointcloud?.octreeInitialized,
+        available: {
+          hasOctree: !!pointcloud?.octree,
+          hasGeometry: !!pointcloud?.geometry,
+          hasBuffer: !!pointcloud?.geometry?.attributes?.position?.array
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error in monitorLoadedData:', {
+        error,
+        pointcloudState: {
+          type: typeof pointcloud,
+          keys: Object.keys(pointcloud || {}),
+          prototype: Object.getPrototypeOf(pointcloud)
+        }
+      });
+    }
+  };
 
   return (
     <div className="w-full h-full relative">
