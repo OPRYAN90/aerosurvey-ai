@@ -297,25 +297,60 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           
           const pointcloud = e.pointcloud;
           
+          // Set up monitoring BEFORE adding to scene
+          monitorLoadedData(pointcloud);
+          const cleanup = setupPointCloudMonitoring(pointcloud);
+
+          // Add update event listener
+          viewer.addEventListener('update', () => {
+            if (viewer.scene.pointclouds.length > 0) {
+              const cloud = viewer.scene.pointclouds[0];
+              
+              // NEW: Track node loading directly
+              cloud.visibleNodes.forEach(node => {
+                // This gives us direct access to loaded nodes
+                if (node.geometryNode?.geometry?.attributes) {
+                  console.log('📍 Node Data Available:', {
+                    name: node.name,
+                    numPoints: node.geometryNode.geometry.attributes.position.count,
+                    hasClassification: !!node.geometryNode.geometry.attributes.classification,
+                    // NEW: Get actual coordinates
+                    coordinates: Array.from(
+                      node.geometryNode.geometry.attributes.position.array.slice(0, 9)
+                    ).map(x => Number(x).toFixed(2))
+                  });
+                }
+              });
+
+              // NEW: Track material state
+              if (cloud.material) {
+                console.log('🎨 Material:', {
+                  colorType: cloud.material.pointColorType,
+                  classification: cloud.material.classification,
+                  uniforms: cloud.material.uniforms.classificationLUT?.value 
+                    ? 'has classification LUT' 
+                    : 'no classification LUT'
+                });
+              }
+            }
+          });
+          
+          console.log('🎯 Pointcloud object:', {
+            exists: !!pointcloud,
+            pcoGeometry: !!pointcloud?.pcoGeometry,
+            root: !!pointcloud?.pcoGeometry?.root
+          });
+
+          // Now add to scene and show viewer
           viewer.scene.addPointCloud(pointcloud);
           viewer.fitToScreen();
           setIsLoading(false);
           console.log('✅ Point cloud added to scene and viewer shown');
           
-          // Wait 10 seconds before starting to log the state
+          // Keep the delayed root node inspection
           setTimeout(() => {
             console.log('🎯 Starting state logging after 10s delay');
             
-            console.log('🎯 Pointcloud object:', {
-              exists: !!pointcloud,
-              pcoGeometry: !!pointcloud?.pcoGeometry,
-              root: !!pointcloud?.pcoGeometry?.root
-            });
-            
-            // Add monitoring
-            monitorLoadedData(pointcloud);
-            const cleanup = setupPointCloudMonitoring(pointcloud);
-
             // Log root node details
             if (pointcloud.pcoGeometry?.root) {
               console.log('🌱 Root node details:', {
