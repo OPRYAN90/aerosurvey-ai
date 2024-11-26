@@ -40,9 +40,9 @@ class SimpleGroundClassifier:
             logging.error(f"Error loading file: {str(e)}")
             raise
             
-    def process_chunks(self) -> Dict[str, List[int]]:
-        ground_indices = []
-        non_ground_indices = []
+    def process_chunks(self) -> Dict[str, List[Dict[str, float]]]:
+        ground_points = []
+        non_ground_points = []
         
         total_chunks = (self.total_points + self.chunk_size - 1) // self.chunk_size
         
@@ -52,26 +52,37 @@ class SimpleGroundClassifier:
             
             logging.info(f"Processing chunk {chunk_idx + 1}/{total_chunks}")
             
+            # Get coordinates for this chunk
+            x = self.las_data.x[chunk_start:chunk_end]
+            y = self.las_data.y[chunk_start:chunk_end]
+            z = self.las_data.z[chunk_start:chunk_end]
+            
             chunk_mask = np.random.choice(
                 [True, False],
                 size=chunk_size,
                 p=[0.5, 0.5]
             )
             
-            chunk_ground = np.where(chunk_mask)[0] + chunk_start
-            chunk_non_ground = np.where(~chunk_mask)[0] + chunk_start
-            
-            ground_indices.extend(chunk_ground.tolist())
-            non_ground_indices.extend(chunk_non_ground.tolist())
+            # Create point dictionaries with coordinates
+            for i in range(chunk_size):
+                point = {
+                    "x": float(x[i]),
+                    "y": float(y[i]),
+                    "z": float(z[i])
+                }
+                if chunk_mask[i]:
+                    ground_points.append(point)
+                else:
+                    non_ground_points.append(point)
             
             gc.collect()
             
         return {
-            "ground": sorted(ground_indices),
-            "nonGround": sorted(non_ground_indices)
+            "ground": ground_points,
+            "nonGround": non_ground_points
         }
 
-    def classify_ground(self) -> Dict[str, Union[List[int], Dict[str, Union[int, str, float]]]]:
+    def classify_ground(self) -> Dict[str, Union[List[Dict[str, float]], Dict[str, Union[int, str, float]]]]:
         start_time = time.time()
         
         if not self.las_data:
