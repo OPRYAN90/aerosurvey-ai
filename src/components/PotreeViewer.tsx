@@ -188,44 +188,35 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         });
 
         viewer.addEventListener('update', () => {
-          if (viewer.scene.pointclouds.length > 0) {
-            const now = Date.now();
-            if (now - lastLogTime >= LOG_INTERVAL) {
+          const now = Date.now();
+          if (now - lastLogTime >= LOG_INTERVAL) {
+            if (viewer.scene.pointclouds.length > 0) {
               const cloud = viewer.scene.pointclouds[0];
-              console.log('📊 Point Cloud State:', {
-                totalPoints: cloud.numPoints,
-                visibleNodes: cloud.visibleNodes?.length || 0,
-                boundingBox: cloud.boundingBox ? {
-                  min: cloud.boundingBox.min.toArray(),
-                  max: cloud.boundingBox.max.toArray()
-                } : null
-              });
-              lastLogTime = now;
-
-              const visibleNodes = cloud.visibleNodes || [];
               
-              console.log('🔍 Visible Nodes Detail:', {
-                count: visibleNodes.length,
-                nodes: visibleNodes.map((node: any) => ({
-                  name: node.name,
-                  numPoints: node.getNumPoints?.() || 0,
-                  level: node.getLevel?.(),
-                  isLoaded: node.isLoaded?.(),
-                  boundingBox: node.getBoundingBox?.(),
-                  hasGeometry: !!node.geometryNode?.geometry
-                }))
+              cloud.visibleNodes.forEach(node => {
+                if (node.geometryNode?.geometry?.attributes) {
+                  console.log('📍 Node Data Available:', {
+                    name: node.name,
+                    numPoints: node.geometryNode.geometry.attributes.position.count,
+                    hasClassification: !!node.geometryNode.geometry.attributes.classification,
+                    coordinates: Array.from(
+                      node.geometryNode.geometry.attributes.position.array.slice(0, 9)
+                    ).map(x => Number(x).toFixed(2))
+                  });
+                }
               });
 
-              // Log point details for first node as sample
-              if (visibleNodes[0]?.geometryNode?.geometry?.attributes?.position) {
-                const firstNode = visibleNodes[0];
-                const positions = firstNode.geometryNode.geometry.attributes.position;
-                console.log('📊 Sample Node Points:', {
-                  nodeName: firstNode.name,
-                  totalPointsInNode: positions.count,
-                  firstFewPoints: Array.from(positions.array.slice(0, 9))
+              if (cloud.material) {
+                console.log('🎨 Material:', {
+                  colorType: cloud.material.pointColorType,
+                  classification: cloud.material.classification,
+                  uniforms: cloud.material.uniforms.classificationLUT?.value 
+                    ? 'has classification LUT' 
+                    : 'no classification LUT'
                 });
               }
+              
+              lastLogTime = now;
             }
           }
         });
@@ -303,59 +294,65 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
 
           // Add first update event listener
           viewer.addEventListener('update', () => {
-            if (viewer.scene.pointclouds.length > 0) {
-              const cloud = viewer.scene.pointclouds[0];
-              
-              cloud.visibleNodes.forEach(node => {
-                // This gives us direct access to loaded nodes
-                if (node.geometryNode?.geometry?.attributes) {
-                  console.log('📍 Node Data Available:', {
-                    name: node.name,
-                    numPoints: node.geometryNode.geometry.attributes.position.count,
-                    hasClassification: !!node.geometryNode.geometry.attributes.classification,
-                    coordinates: Array.from(
-                      node.geometryNode.geometry.attributes.position.array.slice(0, 9)
-                    ).map(x => Number(x).toFixed(2))
+            const now = Date.now();
+            if (now - lastLogTime >= LOG_INTERVAL) {
+              if (viewer.scene.pointclouds.length > 0) {
+                const cloud = viewer.scene.pointclouds[0];
+                
+                cloud.visibleNodes.forEach(node => {
+                  if (node.geometryNode?.geometry?.attributes) {
+                    console.log('📍 Node Data Available:', {
+                      name: node.name,
+                      numPoints: node.geometryNode.geometry.attributes.position.count,
+                      hasClassification: !!node.geometryNode.geometry.attributes.classification,
+                      coordinates: Array.from(
+                        node.geometryNode.geometry.attributes.position.array.slice(0, 9)
+                      ).map(x => Number(x).toFixed(2))
+                    });
+                  }
+                });
+
+                if (cloud.material) {
+                  console.log('🎨 Material:', {
+                    colorType: cloud.material.pointColorType,
+                    classification: cloud.material.classification,
+                    uniforms: cloud.material.uniforms.classificationLUT?.value 
+                      ? 'has classification LUT' 
+                      : 'no classification LUT'
                   });
                 }
-              });
-
-              if (cloud.material) {
-                console.log('🎨 Material:', {
-                  colorType: cloud.material.pointColorType,
-                  classification: cloud.material.classification,
-                  uniforms: cloud.material.uniforms.classificationLUT?.value 
-                    ? 'has classification LUT' 
-                    : 'no classification LUT'
-                });
+                
+                lastLogTime = now;
               }
             }
           });
 
-          // Add second update event listener for detailed point data
+          // Remove or modify second update event listener to use same interval
           viewer.addEventListener('update', () => {
-            if (viewer.scene.pointclouds.length > 0) {
-              const cloud = viewer.scene.pointclouds[0];
-              
-              cloud.visibleNodes.forEach(node => {
-                if (node.geometryNode?.geometry?.attributes) {
-                  const geometry = node.geometryNode.geometry;
-                  // Get ALL points instead of just 5
-                  console.log('🔍 Node Point Data:', {
-                    name: node.name,
-                    pointData: Array.from({ length: geometry.attributes.position.count }, 
-                      (_, i) => ({
-                        position: [
-                          geometry.attributes.position.array[i * 3],
-                          geometry.attributes.position.array[i * 3 + 1],
-                          geometry.attributes.position.array[i * 3 + 2]
-                        ],
-                        classification: geometry.attributes.classification?.array[i]
-                      })
-                    )
-                  });
-                }
-              });
+            const now = Date.now();
+            if (now - lastLogTime >= LOG_INTERVAL) {
+              if (viewer.scene.pointclouds.length > 0) {
+                const cloud = viewer.scene.pointclouds[0];
+                
+                cloud.visibleNodes.forEach(node => {
+                  if (node.geometryNode?.geometry?.attributes) {
+                    const geometry = node.geometryNode.geometry;
+                    console.log('🔍 Node Point Data:', {
+                      name: node.name,
+                      pointData: Array.from({ length: Math.min(5, geometry.attributes.position.count) }, 
+                        (_, i) => ({
+                          position: [
+                            geometry.attributes.position.array[i * 3],
+                            geometry.attributes.position.array[i * 3 + 1],
+                            geometry.attributes.position.array[i * 3 + 2]
+                          ],
+                          classification: geometry.attributes.classification?.array[i]
+                        })
+                      )
+                    });
+                  }
+                });
+              }
             }
           });
           
@@ -932,6 +929,40 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         }
       });
 
+      // Add delayed transformation state logging with error handling
+      setTimeout(() => {
+        try {
+          console.log('⏱️ Starting delayed transformation state check');
+          
+          if (!pointcloud) {
+            throw new Error('Pointcloud not available for transformation check');
+          }
+
+          const transformState = {
+            hasMatrixWorld: !!pointcloud.matrixWorld,
+            hasPosition: !!pointcloud.position,
+            hasScale: !!pointcloud.scale,
+            hasBoundingBox: !!pointcloud.boundingBox,
+            hasPcoGeometry: !!pointcloud.pcoGeometry
+          };
+
+          console.log('🔍 Transform state availability:', transformState);
+
+          logTransformationState(pointcloud);
+        } catch (error) {
+          console.error('❌ Error in transformation state check:', {
+            error,
+            pointcloudState: {
+              exists: !!pointcloud,
+              properties: pointcloud ? Object.keys(pointcloud) : [],
+              type: typeof pointcloud
+            }
+          });
+        } finally {
+          console.log('✅ Transformation state check completed (success or failure)');
+        }
+      }, 5000);
+
     } catch (error) {
       console.error('❌ Error in monitorLoadedData:', {
         error,
@@ -1021,6 +1052,62 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         clearInterval(nodeCheckInterval);
       }
     };
+  };
+
+  const logTransformationState = (pointcloud: any) => {
+    try {
+      const state = {
+        matrixWorld: pointcloud.matrixWorld?.elements || 'not available',
+        position: pointcloud.position?.toArray() || 'not available',
+        scale: pointcloud.scale?.toArray() || 'not available',
+        boundingBox: pointcloud.boundingBox ? {
+          min: pointcloud.boundingBox.min?.toArray() || 'not available',
+          max: pointcloud.boundingBox.max?.toArray() || 'not available'
+        } : 'not available',
+        pcoGeometry: pointcloud.pcoGeometry ? {
+          offset: pointcloud.pcoGeometry.offset || 'not available',
+          scale: pointcloud.pcoGeometry.scale || 'not available'
+        } : 'not available'
+      };
+
+      console.log('🔄 Transformation State:', state);
+      return state;
+    } catch (error) {
+      console.error('❌ Error getting transformation state:', {
+        error,
+        pointcloudAvailable: !!pointcloud,
+        properties: pointcloud ? Object.keys(pointcloud) : []
+      });
+      return null;
+    }
+  };
+
+  // Will be used for coordinate transformations in future updates
+  const transformCoordinates = (
+    point: { x: number, y: number, z: number },
+    pointcloud: any
+  ) => {
+    // First apply metadata scale and offset
+    const transformed = new THREE.Vector3(
+      (point.x - pointcloud.pcoGeometry.offset[0]) * pointcloud.pcoGeometry.scale[0],
+      (point.y - pointcloud.pcoGeometry.offset[1]) * pointcloud.pcoGeometry.scale[1],
+      (point.z - pointcloud.pcoGeometry.offset[2]) * pointcloud.pcoGeometry.scale[2]
+    );
+    
+    // Then apply Potree's matrix transformation
+    transformed.applyMatrix4(pointcloud.matrixWorld);
+    
+    console.log('📍 Coordinate Transformation:', {
+      original: point,
+      transformed: transformed.toArray(),
+      appliedTransforms: {
+        offset: pointcloud.pcoGeometry.offset,
+        scale: pointcloud.pcoGeometry.scale,
+        matrix: pointcloud.matrixWorld.elements
+      }
+    });
+
+    return transformed;
   };
 
   return (
