@@ -301,12 +301,11 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           monitorLoadedData(pointcloud);
           const cleanup = setupPointCloudMonitoring(pointcloud);
 
-          // Add update event listener
+          // Add first update event listener
           viewer.addEventListener('update', () => {
             if (viewer.scene.pointclouds.length > 0) {
               const cloud = viewer.scene.pointclouds[0];
               
-              // NEW: Track node loading directly
               cloud.visibleNodes.forEach(node => {
                 // This gives us direct access to loaded nodes
                 if (node.geometryNode?.geometry?.attributes) {
@@ -314,7 +313,6 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
                     name: node.name,
                     numPoints: node.geometryNode.geometry.attributes.position.count,
                     hasClassification: !!node.geometryNode.geometry.attributes.classification,
-                    // NEW: Get actual coordinates
                     coordinates: Array.from(
                       node.geometryNode.geometry.attributes.position.array.slice(0, 9)
                     ).map(x => Number(x).toFixed(2))
@@ -322,7 +320,6 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
                 }
               });
 
-              // NEW: Track material state
               if (cloud.material) {
                 console.log('🎨 Material:', {
                   colorType: cloud.material.pointColorType,
@@ -332,6 +329,33 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
                     : 'no classification LUT'
                 });
               }
+            }
+          });
+
+          // Add second update event listener for detailed point data
+          viewer.addEventListener('update', () => {
+            if (viewer.scene.pointclouds.length > 0) {
+              const cloud = viewer.scene.pointclouds[0];
+              
+              cloud.visibleNodes.forEach(node => {
+                if (node.geometryNode?.geometry?.attributes) {
+                  const geometry = node.geometryNode.geometry;
+                  // Get ALL points instead of just 5
+                  console.log('🔍 Node Point Data:', {
+                    name: node.name,
+                    pointData: Array.from({ length: geometry.attributes.position.count }, 
+                      (_, i) => ({
+                        position: [
+                          geometry.attributes.position.array[i * 3],
+                          geometry.attributes.position.array[i * 3 + 1],
+                          geometry.attributes.position.array[i * 3 + 2]
+                        ],
+                        classification: geometry.attributes.classification?.array[i]
+                      })
+                    )
+                  });
+                }
+              });
             }
           });
           
