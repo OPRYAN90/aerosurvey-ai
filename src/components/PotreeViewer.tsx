@@ -30,87 +30,6 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
   const [isGroundSegmentationActive, setIsGroundSegmentationActive] = useState(false);
   const [isApplyingSegmentation, setIsApplyingSegmentation] = useState(false);
 
-  const getAllTransformedPoints = (pointcloud: any) => {
-    const allTransformedPoints: number[][] = [];
-
-    function processNode(node: any) {
-      if (!node?.geometryNode?.geometry?.attributes?.position) {
-        console.log(`⚠️ Node ${node.name} has no valid geometry.`);
-        return;
-      }
-
-      try {
-        const geometry = node.geometryNode.geometry;
-        const positions = geometry.attributes.position.array;
-        const numPoints = positions.length / 3;
-
-        for (let i = 0; i < numPoints; i++) {
-          const rawPoint = new THREE.Vector3(
-            positions[i * 3],
-            positions[i * 3 + 1],
-            positions[i * 3 + 2]
-          );
-
-          const worldPoint = rawPoint.clone().applyMatrix4(node.sceneNode.matrixWorld);
-          allTransformedPoints.push(worldPoint.toArray());
-
-          // Log first few points for debugging
-          if (allTransformedPoints.length <= 5) {
-            console.log(`📍 Point ${allTransformedPoints.length}:`, {
-              raw: rawPoint.toArray(),
-              world: worldPoint.toArray()
-            });
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error processing node points:', {
-          nodeName: node.name,
-          error
-        });
-      }
-    }
-
-    function traverseOctree(node: any) {
-      if (!node) return;
-
-      try {
-        // Process current node if it has geometry
-        if (node?.geometryNode?.geometry?.attributes?.position) {
-          processNode(node);
-        }
-
-        // Traverse children
-        const children = node.getChildren?.();
-        if (children?.length) {
-          children.forEach((child: any) => {
-            if (child) traverseOctree(child);
-          });
-        }
-      } catch (error) {
-        console.error('❌ Error traversing node:', {
-          nodeName: node?.name,
-          error
-        });
-      }
-    }
-
-    // Start traversal and return points
-    try {
-      console.log('🔍 Starting octree traversal');
-      traverseOctree(pointcloud.root);
-      
-      console.log('✅ Traversal complete:', {
-        totalPoints: allTransformedPoints.length,
-        samplePoints: allTransformedPoints.slice(0, 5)
-      });
-      
-      return allTransformedPoints;
-    } catch (error) {
-      console.error('❌ Error in point cloud traversal:', error);
-      return [];
-    }
-  };
-
   useEffect(() => {
     const loadDependencies = async () => {
       try {
@@ -262,10 +181,8 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
         viewer.scene.addEventListener('pointcloud_loaded', (e: any) => {
           const pointcloud = e.pointcloud;
           if (pointcloud) {
-            const points = getAllTransformedPoints(pointcloud);
-            console.log('✅ Transformed points:', {
-              total: points.length,
-              sample: points.slice(0, 5)
+            pointcloud.addEventListener('node_loaded', (nodeEvent: any) => {
+              logNodeDetails(nodeEvent.node);
             });
           }
         });
@@ -417,67 +334,6 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
             'Ground Segmentation',
             toggleGroundSegmentation
           ));
-
-          const publicUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
-          
-          window.Potree.loadPointCloud(publicUrl, project.name || 'point cloud', (e: any) => {
-            console.log('🎯 LoadPointCloud callback triggered');
-            
-            const pointcloud = e.pointcloud;
-            
-            // Add delayed execution
-            setTimeout(() => {
-              console.log('⏰ Delayed execution starting...');
-              
-              // Log current state
-              console.log('🔍 Point cloud state at 5s:', {
-                exists: !!pointcloud,
-                hasGeometry: !!pointcloud.pcoGeometry,
-                hasRoot: !!pointcloud.pcoGeometry?.root,
-                loadedNodes: pointcloud.loadedNodes?.size || 0,
-                visibleNodes: pointcloud.visibleNodes?.length || 0
-              });
-
-              // Force processing regardless of state
-              try {
-                const points = getAllPointsOfPointCloud(pointcloud);
-                console.log('📊 All Points Data:', {
-                  totalPoints: points.length,
-                  firstFivePoints: points.slice(0, 5).map(p => ({
-                    x: p.x.toFixed(3),
-                    y: p.y.toFixed(3),
-                    z: p.z.toFixed(3)
-                  })),
-                  lastPoint: points.length > 0 ? {
-                    x: points[points.length - 1].x.toFixed(3),
-                    y: points[points.length - 1].y.toFixed(3),
-                    z: points[points.length - 1].z.toFixed(3)
-                  } : null
-                });
-              } catch (error) {
-                console.error('❌ Error getting points:', error);
-              }
-            }, 5000); // 5 seconds delay
-
-            // Keep existing event listeners
-            pointcloud.addEventListener('points_loaded', () => {
-              try {
-                const updatedPoints = getAllPointsOfPointCloud(pointcloud);
-                console.log('🔄 Updated Points Data:', {
-                  totalPoints: updatedPoints.length,
-                  samplePoints: updatedPoints.slice(0, 5).map(p => ({
-                    x: p.x.toFixed(3),
-                    y: p.y.toFixed(3),
-                    z: p.z.toFixed(3)
-                  }))
-                });
-              } catch (error) {
-                console.error('❌ Error getting updated points:', error);
-              }
-            });
-
-            // ... rest of existing point cloud setup code ...
-          });
         });
 
         const publicUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/converted/${project.id}/metadata.json`;
@@ -486,138 +342,8 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
           console.log('🎯 LoadPointCloud callback triggered');
           
           const pointcloud = e.pointcloud;
-          const allTransformedPoints: number[][] = [];
-
-          // Function to process a node's points
-          function processNode(node: any) {
-            console.log('📦 Processing node:', {
-              name: node?.name || 'unnamed',
-              hasGeometry: !!node?.geometryNode?.geometry,
-              hasPositions: !!node?.geometryNode?.geometry?.attributes?.position
-            });
-
-            if (!node?.geometryNode?.geometry?.attributes?.position) {
-              console.log('⚠️ Node lacks required geometry data');
-              return;
-            }
-            
-            const geometry = node.geometryNode.geometry;
-            const positions = geometry.attributes.position.array;
-            const numPoints = positions.length / 3;
-
-            console.log('📊 Node stats:', {
-              totalPoints: numPoints,
-              arrayLength: positions.length,
-              samplePoint: positions.slice(0, 3)
-            });
-
-            for (let i = 0; i < numPoints; i++) {
-              try {
-                const rawPoint = new THREE.Vector3(
-                  positions[i * 3],
-                  positions[i * 3 + 1],
-                  positions[i * 3 + 2]
-                );
-
-                const worldPoint = rawPoint.clone().applyMatrix4(node.sceneNode.matrixWorld);
-                allTransformedPoints.push(worldPoint.toArray());
-
-                // Log first point of each node
-                if (i === 0) {
-                  console.log('🎯 First point transform:', {
-                    raw: rawPoint.toArray(),
-                    world: worldPoint.toArray(),
-                    matrix: Array.from(node.sceneNode.matrixWorld.elements)
-                  });
-                }
-              } catch (error) {
-                console.error('❌ Point processing error:', { 
-                  nodeId: node.name, 
-                  pointIndex: i, 
-                  error,
-                  rawData: positions.slice(i * 3, (i * 3) + 3)
-                });
-              }
-            }
-          }
-
-          // Recursive function to traverse the octree
-          function traverseOctree(node: any, callback: (node: any) => void) {
-            console.log('🌳 Traversing node:', node?.name || 'unnamed');
-            
-            if (!node) {
-              console.log('⚠️ Null node encountered in traversal');
-              return;
-            }
-
-            if (node.geometryNode?.geometry?.attributes) {
-              callback(node);
-            }
-
-            if (node.children) {
-              console.log('👶 Processing children of:', node.name, 'Count:', node.children.length);
-              node.children.forEach((child: any) => traverseOctree(child, callback));
-            }
-          }
-
-          // Function to process all currently loaded nodes
-          function processAllLoadedNodes() {
-            console.log('🔄 Starting node processing');
-            console.log('📊 Point cloud state:', {
-              hasGeometry: !!pointcloud.pcoGeometry,
-              hasRoot: !!pointcloud.pcoGeometry?.root,
-              totalNodes: pointcloud.pcoGeometry?.nodes?.length || 0
-            });
-
-            if (pointcloud.pcoGeometry?.root) {
-              traverseOctree(pointcloud.pcoGeometry.root, processNode);
-            }
-
-            console.log('✅ Processing complete:', {
-              totalPoints: allTransformedPoints.length,
-              samplePoints: allTransformedPoints.slice(0, 10)
-            });
-          }
-
-          // Guarantee execution after 10 seconds
-          setTimeout(() => {
-            console.log('⏰ Delayed execution starting...');
-            
-            // Log current state
-            console.log('🔍 Point cloud state at 10s:', {
-              exists: !!pointcloud,
-              hasGeometry: !!pointcloud.pcoGeometry,
-              hasRoot: !!pointcloud.pcoGeometry?.root,
-              loadedNodes: pointcloud.loadedNodes?.size || 0,
-              visibleNodes: pointcloud.visibleNodes?.length || 0
-            });
-
-            // Force processing regardless of state
-            processAllLoadedNodes();
-          }, 10000);
-
-          // Keep existing event listeners
-          pointcloud.addEventListener('pointcloud_loaded', () => {
-            console.log('📡 Point cloud loaded event - processing nodes');
-            processAllLoadedNodes();
-          });
-
-          pointcloud.addEventListener('node_added', (event: any) => {
-            console.log('➕ Node added:', event.node?.name);
-            processNode(event.node);
-            
-            console.log('📊 Current transformed points:', {
-              count: allTransformedPoints.length,
-              latest: allTransformedPoints.slice(-5)
-            });
-          });
-
-          pointcloud.addEventListener('visibility_changed', () => {
-            console.log('👁️ Visibility changed - reprocessing nodes');
-            processAllLoadedNodes();
-          });
-
-          // Continue with existing setup...
+          
+          // Set up monitoring BEFORE adding to scene
           monitorLoadedData(pointcloud);
           const cleanup = setupPointCloudMonitoring(pointcloud);
 
@@ -628,7 +354,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
               if (viewer.scene.pointclouds.length > 0) {
                 const cloud = viewer.scene.pointclouds[0];
                 
-                cloud.visibleNodes.forEach(node => {
+                cloud.visibleNodes.forEach((node: any) => {
                   if (node.geometryNode?.geometry?.attributes) {
                     console.log('📍 Node Data Available:', {
                       name: node.name,
@@ -1363,7 +1089,7 @@ export default function PotreeViewer({ project, onError }: PotreeViewerProps) {
             hasPcoGeometry: !!pointcloud.pcoGeometry
           };
 
-          console.log(' Transform state availability:', transformState);
+          console.log('🔍 Transform state availability:', transformState);
 
           logTransformationState(pointcloud);
         } catch (error) {
